@@ -9,6 +9,8 @@ Add environment variable `NPLRUNTIME_ROOT` that point to git root of NPLRuntime.
 Open this folder with visual studio 2017 or above and build the cmake file.
 The output is in folder `Mod/MovieCodecPlugin/MovieCodecPlugin.dll` along with some prebuild dll files
 
+One can also run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft mod installer file.
+
 ### How to Install
 Open paracraft's mod site and install MovieCodecPlugin
 

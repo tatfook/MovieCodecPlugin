@@ -6,3 +6,6 @@ lib/
 licenses/
 *_d.dll
 Win32/
+*.zip
+release/
+*.tmp
