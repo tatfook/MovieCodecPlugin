@@ -1,4 +1,8 @@
+vs.proj/
+.vs/
 bin/
 doc/
 lib/
 licenses/
+*_d.dll
+Win32/
