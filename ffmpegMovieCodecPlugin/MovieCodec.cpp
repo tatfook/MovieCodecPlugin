@@ -72,7 +72,7 @@ m_nMaxCacheFrames(30)
 	m_pAudioCapture = new CAudioCapture();
 	m_bCaptureAudio = true;
 
-	OUTPUT_LOG("MovieCodec intialized\n");
+	OUTPUT_LOG("MovieCodec initialized\n");
 }
 
 ParaEngine::MovieCodec::~MovieCodec()

@@ -8,11 +8,17 @@
 
 
 #include "PluginAPI.h"
+
+/**
+* Optional NPL includes, just in case you want to use some core functions see GetCoreInterface()
+*/
+#include "IParaEngineCore.h"
 #include "IParaEngineApp.h"
 
+extern ParaEngine::IParaEngineCore* GetCoreInterface();
 
 #ifndef OUTPUT_LOG
-#define OUTPUT_LOG	ParaEngine::CParaEngineCore::GetParaEngineCOREInterface()->GetAppInterface()->WriteToLog
+#define OUTPUT_LOG	GetCoreInterface()->GetAppInterface()->WriteToLog
 //#define OUTPUT_LOG	printf
 #endif
 

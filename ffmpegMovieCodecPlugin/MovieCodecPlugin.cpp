@@ -25,9 +25,23 @@ extern "C" {
 	CORE_EXPORT_DECL ParaEngine::ClassDescriptor* LibClassDesc(int i);
 	CORE_EXPORT_DECL void LibInit();
 	CORE_EXPORT_DECL void LibActivate(int nType, void* pVoid);
+	CORE_EXPORT_DECL void LibInitParaEngine(ParaEngine::IParaEngineCore* pCoreInterface);
 #ifdef __cplusplus
 }   /* extern "C" */
 #endif
+
+
+ParaEngine::IParaEngineCore* g_pCoreInterface = NULL;
+ParaEngine::IParaEngineCore* GetCoreInterface()
+{
+	return g_pCoreInterface;
+}
+
+CORE_EXPORT_DECL void LibInitParaEngine(ParaEngine::IParaEngineCore* pCoreInterface)
+{
+	g_pCoreInterface = pCoreInterface;
+}
+
 
 HINSTANCE Instance = NULL;
 
