@@ -31,4 +31,5 @@ Press F9 or use `/recoder` command to launch the movie codec.
 
 - 在Paracraft中按F9或输入`/recorder`命令启动插件。
 
-
+## 常见问题
+-  请确保电脑使用的是立体声输出，否则会crash.
