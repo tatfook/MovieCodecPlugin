@@ -123,7 +123,11 @@ namespace ParaEngine
 		
 		int open_audio(AVFormatContext *oc, AVCodec *codec, AVStream *st);
 		void close_audio(AVFormatContext *oc, AVStream *st);
-		
+
+		/*seek to start_time, in s*/
+		int internal_seek(float start_time);
+
+	
 	private:
 		/** Video capture mode	*/
 		MOVIE_CAPTURE_MODE m_nStereoCaptureMode;
@@ -208,6 +212,5 @@ namespace ParaEngine
 		bool m_bCaptureMouse;
 		std::vector<BYTE> g_buffer[2];
 		int m_nLastBitmapByteCount;
-		
 	};
 }
