@@ -673,7 +673,7 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 	pkt.size = 0;
 	int ret = -1;
 	int flush = 0;
-	if (m_pFormatContext->oformat->flags & AVFMT_RAWPICTURE && !flush) {
+	if (0/*m_pFormatContext->oformat->flags & AVFMT_RAWPICTURE && !flush*/) {
 		/* Raw video case - directly store the picture in the packet */
 		
 		pkt.flags |= AV_PKT_FLAG_KEY;
@@ -819,7 +819,7 @@ AVStream * ParaEngine::MovieCodec::add_stream(AVFormatContext *oc, AVCodec **cod
 
 	/* Some formats want stream headers to be separate. */
 	if (oc->oformat->flags & AVFMT_GLOBALHEADER)
-		c->flags |= CODEC_FLAG_GLOBAL_HEADER;
+		c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
 	return st;
 }
@@ -939,7 +939,7 @@ int ParaEngine::MovieCodec::open_audio(AVFormatContext *oc, AVCodec *codec, AVSt
 
 	m_samples_count = 0;
 	
-	m_src_nb_samples = c->codec->capabilities & CODEC_CAP_VARIABLE_FRAME_SIZE ?
+	m_src_nb_samples = c->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE ?
 		10000 : c->frame_size;
 
 	AVSampleFormat avInputFormat = (m_pAudioCapture->GetBitsPerSample() == 16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_FLT);

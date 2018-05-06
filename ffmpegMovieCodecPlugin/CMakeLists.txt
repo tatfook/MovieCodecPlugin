@@ -5,7 +5,7 @@
 # add environment variable NPLRUNTIME_ROOT that point to git root of NPLRuntime.
 
 # NOTE: modify the root directory path if it is installed at a different location. 
-set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg20140501Compiled)
+set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
@@ -61,8 +61,6 @@ IF(MSVC)
 	# /GR- Remove RTTI to miminize the executable size
 	SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /GR-")
 	SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
-	# add a stripped version of symbol files during release build
-	SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LARGEADDRESSAWARE /opt:ref /DEBUG /PDBSTRIPPED:Release/MovieCodecPlugin.stripped.pdb")
 ENDIF()
 
 
@@ -76,7 +74,7 @@ SET(CMAKE_DEBUG_POSTFIX "_d")
 
 link_directories("${ffmpeg_Root}/lib/")
 
-link_libraries(MovieCodecPlugin  avcodec avutil avformat swscale swresample Winmm Avrt)
+link_libraries(MovieCodecPlugin  libavcodec.a libavutil.a libavformat.a libswscale.a libswresample.a Winmm Avrt)
 
 # add the executable
 add_library(MovieCodecPlugin SHARED ${MovieCodecPlugin_SRCS})
