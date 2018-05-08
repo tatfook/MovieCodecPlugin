@@ -23,14 +23,14 @@ struct AudioFile
 {
 	AudioFile(std::string file, float s, float e)
 		:m_strFileName(file)
-		, m_fStartTime(s)
-		, m_fEndTime(e)
+		, m_nStartFrameNum(s)
+		, m_nEndFrameNum(e)
 	{}
 	std::string m_strFileName;
-	unsigned int m_fStartTime;
-	unsigned int m_fEndTime;
+	unsigned int m_nStartFrameNum;
+	unsigned int m_nEndFrameNum;
 };
-
+typedef std::vector<AudioFile> AudioFiles;
 
 class AudioMixer
 {
@@ -38,9 +38,11 @@ public:
 	AudioMixer(AVFormatContext* fmtCtx, ParaEngine::MovieCodec* movieCodec);
 	~AudioMixer();
 
-	void AddAudioFile( AudioFile& audio);
+	void ParseAudioFiles(const std::string& rawdata);
 
 	bool Mix();
+
+	void SetCaptureStartFrameNum(unsigned int );
 
 private:
 	void InitResampleSettings(AVFormatContext* pInputFormatContext);
@@ -68,6 +70,7 @@ private:
 	AVCodecContext* m_pAudioEncoderContext;
 	AVCodec* m_pAudioCoder;
 
+	unsigned long m_nCaptureStartFrameNum;
 
 	ParaEngine::MovieCodec* _movieCodec;
 };

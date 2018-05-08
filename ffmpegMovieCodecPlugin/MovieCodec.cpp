@@ -30,6 +30,7 @@ extern "C"
 #include "AudioCapture.h"
 #include "MovieCodec.h"
 #include "AudioMixer.h"
+#include "FrameRateController.h"
 
 /** define this to duplicate lagged frames. */
 // #define DUPLICATE_TAGGED_FRAMES 
@@ -41,8 +42,6 @@ extern "C"
 #define ENABLE_ASYNC_ENCODING   true
 
 using namespace ParaEngine;
-
-AudioMixer* g_pmixer = nullptr;
 
 ParaEngine::MovieCodec::MovieCodec()
 : m_bIsBegin(false)
@@ -73,6 +72,8 @@ ParaEngine::MovieCodec::MovieCodec()
 , m_bEnableAsyncEncoding(ENABLE_ASYNC_ENCODING)
 , m_nLastLostVideoFrame(0)
 , m_nMaxCacheFrames(30)
+, m_AudioMixer(nullptr)
+, m_nFrameIndex(0)
 {
 	CoInitialize(NULL);
 	StaticInit();
@@ -198,8 +199,12 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 		{
 			m_nLastLeftDataCount = 0;
 			// move dudio staff to AudioMixer class
-			m_audio_st = add_stream(m_pFormatContext, &m_audio_codec, m_pOutputFormat->audio_codec);
-			g_pmixer = new AudioMixer(m_pFormatContext,this);
+
+			if (m_nHeight + 2*m_nLeft >= 1000) {// 1080p, why 1000? because m_nHeight = ((int)(height / 16)) * 16;
+				m_AudioMixer = new AudioMixer(m_pFormatContext, this);
+			}else{
+				m_audio_st = add_stream(m_pFormatContext, &m_audio_codec, m_pOutputFormat->audio_codec);
+			}
 
 			if (m_audio_st)
 			{
@@ -210,9 +215,6 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 			}
 		}
 	}
-
-	
-		
 
 	/* Now that all the parameters are set, we can open the audio and
 	* video codecs and allocate the necessary encode buffers. */
@@ -253,16 +255,16 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	m_bStartEvent = true;
 
 	m_nCurrentFrame = 0;
+
 	return 0;
 }
 
 DWORD ParaEngine::MovieCodec::EndCaptureInThread()
 {
-	if (IsCaptureAudio()&& g_pmixer)
+	if (IsCaptureAudio()&& m_AudioMixer)
 	{// mix the audio
-		g_pmixer->AddAudioFile(AudioFile("C:/Users/azoth/Desktop/gujianqitan2.mp3", 0, 0));
-		g_pmixer->AddAudioFile(AudioFile("C:/Users/azoth/Desktop/gujianqitan1.mp3", 0, 0));
-		g_pmixer->Mix();
+		m_AudioMixer->ParseAudioFiles(m_strAudioMap);
+		m_AudioMixer->Mix();
 	}
 
 	m_pAudioCapture->EndCaptureInThread();
@@ -292,6 +294,11 @@ DWORD ParaEngine::MovieCodec::EndCaptureInThread()
 	if (!(m_pOutputFormat->flags & AVFMT_NOFILE)){
 		/* Close the output file. */
 		avio_close(m_pFormatContext->pb);
+	}
+
+	if (m_AudioMixer) {
+		delete m_AudioMixer;
+		m_AudioMixer = nullptr;
 	}
 
 
@@ -454,43 +461,128 @@ DWORD ParaEngine::MovieCodec::CaptureVideoFrame()
 DWORD ParaEngine::MovieCodec::CaptureThreadFunction()
 {
 	DWORD res = BeginCaptureInThread();
-	if (res != 0)
-	{
+	if (res != 0){
 		SetErrorCode(res);
 		EndCaptureInThread();
 		return res;
 	}
 
+	if (m_AudioMixer) {
+		CaptureThreadFunctionCaptureLoop1080P();
+	}else {
+		CaptureThreadFunctionCaptureLoopOriginal();
+	}
+
+	return EndCaptureInThread();
+}
+
+void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
+{
 	// capture loop
 	bool bDone = false;
 	bool bFirstPacket = true;
-	
+
 	DWORD nBeginTime = timeGetTime();
-	
+
 	auto pParaEngine = GetCoreInterface()->GetAppInterface()->GetAttributeObject();
 	auto pAsyncLoader = pParaEngine->GetChildAttributeObject("AsyncLoader");
 	auto pGameFRC = pParaEngine->GetChildAttributeObject("gameFRC");
 	auto pScene = pParaEngine->GetChildAttributeObject("Scene");
 	auto pBlockEngine = pScene->GetChildAttributeObject(1, 1);
-	auto pCameras = pScene->GetChildAttributeObject(6, 1);
-	auto pCAutoCamera = pCameras->GetChildAttributeObject(0, 0);
-	
+
 	// tell render eigine to stop async-load-mode before video capture actully begin
 	// by doing so we can avoid capturing only a partial items of a scene  
 	// get the previous AsynChunkMode value to bPreAsynChunkModeValue 
-	bool bPreAsyncChunkModeValue;
+	bool bPreAsyncChunkModeValue = true;
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Get(pBlockEngine, &bPreAsyncChunkModeValue);
-	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine,false);
+	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, false);
+
+	pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, true);
 
 	// get current frame number
 	int nCurrentFrameNum = 0;
-	pCAutoCamera->GetAttributeClass()->GetField("FrameNumber")->Get(pCAutoCamera, &nCurrentFrameNum);
 	int nLastFrrameNum = nCurrentFrameNum;
 	int nFrameCount = 0;
+	bool firstCaptureFrame = true;
+	int lastTime = 0;
+	pGameFRC->GetAttributeClass()->GetField("Time")->Get(pGameFRC, &lastTime);
+	const int deltaTime = (1000.0 / (double)m_nRecordingFPS);
+	for (UINT32 nPasses = 0; !bDone; nPasses++){
+		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
+
+		if (m_bStopEvent) {
+			OUTPUT_LOG("Received stop event after %d frames\n", m_nCurrentFrame);
+			bDone = true;
+			continue; // exits loop
+		}
+
+		if (m_nLastError != 0) {
+			OUTPUT_LOG("Error: Unexpected error code: %d \n", m_nLastError);
+			bDone = true;
+			continue; // exits loop
+		}
+
+		DWORD nCurTime = timeGetTime();
+
+		float nFramesToCapture = (float)(((nCurTime - nBeginTime) / 1000.f * m_nRecordingFPS) - m_nCurrentFrame);
+		if (nFramesToCapture > 0.f){
+			// get "ItemsLeft" to nItemsLeft, "DirtyBlockCount" to nDirtyBlockCount
+			int nItemsLeft = -1, nDirtyBlockCount = -1;
+			pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
+			pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
+
+			// advance game to next frame 
+			pScene->GetAttributeClass()->GetField("FrameNumber")->Get(pScene, &nCurrentFrameNum);
+			lastTime += deltaTime;
+			pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
+			// wait render engine to finish current frame 
+			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrrameNum)){
+				// nItemsLeft or nDirtyBlockCount bigger than 0 implys the engine has not finished rendering the current scene yet
+				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+				nItemsLeft = -1, nDirtyBlockCount = -1;
+				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
+				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
+				pScene->GetAttributeClass()->GetField("FrameNumber")->Get(pScene, &nCurrentFrameNum);
+			}//end while
+			if (CaptureVideoFrame() != 0){
+				OUTPUT_LOG("Error: FrameCaptureInThread return non-zero value \n");
+				bDone = true;
+				continue; // exits loop
+			}else{
+				if (nFramesToCapture > 1.f){
+					m_nCurrentFrame += (int)(nFramesToCapture - 1 + 0.5f);
+				}
+				nFrameCount++;
+				if (firstCaptureFrame) {
+					m_AudioMixer->SetCaptureStartFrameNum(nCurrentFrameNum);
+					firstCaptureFrame = false;
+				}
+			}
+			nLastFrrameNum = nCurrentFrameNum;
+			std::this_thread::sleep_for(std::chrono::milliseconds(25));
+		}
+	}// end for loop
+
+	OUTPUT_LOG("frame number: %d !\n", nFrameCount);
+
+	// set back previous AsynChunkMode value when we finish capturing video
+	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, bPreAsyncChunkModeValue);
+	// resume the game
+	pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, false);
+}
+
+void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoopOriginal()
+{
+	// capture loop
+	bool bDone = false;
+	bool bFirstPacket = true;
+
+	DWORD nBeginTime = timeGetTime();
+
 	for (UINT32 nPasses = 0; !bDone; nPasses++)
 	{
 		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
-		
+
 		if (m_bStopEvent) {
 			OUTPUT_LOG("Received stop event after %d frames\n", m_nCurrentFrame);
 			bDone = true;
@@ -508,22 +600,6 @@ DWORD ParaEngine::MovieCodec::CaptureThreadFunction()
 		float nFramesToCapture = (float)(((nCurTime - nBeginTime) / 1000.f * m_nRecordingFPS) - m_nCurrentFrame);
 		if (nFramesToCapture > 0.f)
 		{
-			// get "ItemsLeft" to nItemsLeft, "DirtyBlockCount" to nDirtyBlockCount
-			int nItemsLeft = -1, nDirtyBlockCount = -1;
-			pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
-			pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
-			pCAutoCamera->GetAttributeClass()->GetField("FrameNumber")->Get(pCAutoCamera, &nCurrentFrameNum);
-			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum <= nLastFrrameNum))
-			{
-				// nItemsLeft or nDirtyBlockCount bigger than 0 implys the engine has not finished rendering the current scene yet
-				// pause the game and sleep the capture thread to wait until render engine finishes current scene
-				pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, true);
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
-				nItemsLeft = -1, nDirtyBlockCount = -1;
-				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
-				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
-				pCAutoCamera->GetAttributeClass()->GetField("FrameNumber")->Get(pCAutoCamera, &nCurrentFrameNum);
-			}
 			if (CaptureVideoFrame() != 0)
 			{
 				OUTPUT_LOG("Error: FrameCaptureInThread return non-zero value \n");
@@ -546,30 +622,20 @@ DWORD ParaEngine::MovieCodec::CaptureThreadFunction()
 					m_nCurrentFrame += (int)(nFramesToCapture - 1 + 0.5f);
 #endif
 				}
-				nFrameCount++;
-			}	
-			nLastFrrameNum = nCurrentFrameNum;
-			// resume the game
-			pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, false);
+			}
+
 		}
-		
-		if ( IsCaptureAudio())
+
+		if (IsCaptureAudio())
 		{
-		//	CaptureAudioFrame();
+			CaptureAudioFrame();
 		}
 		if (bFlushStream)
 		{
 			// write_frame(m_pFormatContext, NULL, NULL, NULL);
 		}
-		
 		std::this_thread::sleep_for(std::chrono::milliseconds(m_nCaptureInterval));
 	}
-	OUTPUT_LOG("frame number: last: %d, cur: %d\n", nFrameCount, nFrameCount);
-
-	// set back previous AsynChunkMode value when we finish capturing video
-	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, bPreAsyncChunkModeValue);
-
-	return EndCaptureInThread();
 }
 
 void ParaEngine::MovieCodec::ResetStates()
@@ -778,7 +844,9 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 		/* If size is zero, it means the image was buffered. */
 		if (got_packet) {
 			ret = write_frame(m_pFormatContext, &c->time_base, m_video_st, &pkt);
-			// av_free_packet(&pkt); // pkts is reference counted no need to free
+			if (ret < 0) {
+				OUTPUT_LOG("Fail to write frame encoding frame!\n");
+			}
 		}
 		else {
 			ret = 0;
@@ -788,8 +856,10 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 	return 0;
 }
 
-int ParaEngine::MovieCodec::EndCapture()
+int ParaEngine::MovieCodec::EndCapture(std::string auidoMap)
 {
+	m_strAudioMap = auidoMap;
+
 	if (!m_bIsBegin)
 		return 0;
 
@@ -807,6 +877,9 @@ int ParaEngine::MovieCodec::EndCapture()
 	}
 
 	m_bIsBegin = false;
+
+	m_nFrameIndex = 0;
+
 	return 0;
 }
 
@@ -955,27 +1028,19 @@ int ParaEngine::MovieCodec::write_frame(AVFormatContext *fmt_ctx, const AVRation
 	/* rescale output packet timestamp values from codec to stream timebase */
 	if (pkt)
 	{
-		if (st->codec->codec_type == AVMEDIA_TYPE_AUDIO)
-		{
-			//pkt->pts = av_rescale_q_rnd(pkt->pts, *time_base, st->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-			//pkt->dts = av_rescale_q_rnd(pkt->dts, *time_base, st->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-			//pkt->duration = (int)av_rescale_q(pkt->duration, *time_base, st->time_base);
-		}
-		else {
-			static unsigned int frame_index = 0;
+		if (m_AudioMixer && st->codec->codec_type == AVMEDIA_TYPE_VIDEO){
 			int64_t calc_duration = av_rescale_q_rnd(1, *time_base, st->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-			pkt->pts = frame_index*calc_duration;
-			pkt->dts = pkt->pts*0.8;
+			pkt->pts = m_nFrameIndex*calc_duration;
+			pkt->dts = pkt->pts;
 			pkt->duration = calc_duration / st->time_base.den;
-			frame_index++;
+			m_nFrameIndex++;
+		}else {
+			pkt->pts = av_rescale_q_rnd(pkt->pts, *time_base, st->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+			pkt->dts = av_rescale_q_rnd(pkt->dts, *time_base, st->time_base, (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
+			pkt->duration = (int)av_rescale_q(pkt->duration, *time_base, st->time_base);
 		}
-		
-
 		pkt->stream_index = st->index;	
 	}
-	
-	
-
 	/* Write the compressed frame to the media file. */
 	std::unique_lock<std::recursive_mutex> lock_(m_mutex_io_writer);
 	// since all frames are in order, we use av_write_frame() instead of av_interleaved_write_frame();
@@ -1285,23 +1350,9 @@ void ParaEngine::MovieCodec::SetStereoCaptureMode(MOVIE_CAPTURE_MODE nMode /*= M
 	m_nStereoCaptureMode = nMode;
 }
 
-int ParaEngine::MovieCodec::internal_seek(float start_time)
+int MovieCodec::GetRecordingFPS()
 {
-	/*int64_t seek_pos = 0;
-
-	if (start_time < 0)
-		return -1;
-
-	seek_pos = start_time*AV_TIME_BASE;
-	if (m_format_ctx->start_time != AV_NOPTS_VALUE)
-		seek_pos += m_format_ctx->start_time;
-
-	if (av_seek_frame(m_format_ctx, -1, seek_pos, AVSEEK_FLAG_BACKWARD) < 0)
-	{
-		OUTPUT_LOG("%s,  av_seek_frame() seek to %.3f failed!", __FUNCTION__, (double)seek_pos / AV_TIME_BASE);
-		return -2;
-	}*/
-	return 0;
+	return m_nRecordingFPS;
 }
 
 
