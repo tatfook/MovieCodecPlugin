@@ -95,9 +95,9 @@ if(MSVC)
 	STRING(REGEX REPLACE "^.*[/\\]([^/\\]+)$" "\\1" RELEASE_EXE_NAME "${RELEASE_EXE_PATH}" )
 
 	if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
-		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl-dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
+		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl_dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
 	else()
-		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl-dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
+		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl_dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
 	endif()
 
 	ADD_CUSTOM_COMMAND(

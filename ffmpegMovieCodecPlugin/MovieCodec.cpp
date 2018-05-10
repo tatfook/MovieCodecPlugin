@@ -10,6 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include <vector>
+#include <chrono>
 
 extern "C"
 {
@@ -489,15 +490,26 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 	auto pGameFRC = pParaEngine->GetChildAttributeObject("gameFRC");
 	auto pScene = pParaEngine->GetChildAttributeObject("Scene");
 	auto pBlockEngine = pScene->GetChildAttributeObject(1, 1);
+	auto pAssetManager = pParaEngine->GetChildAttributeObject(0);
+	
 
-	// tell render eigine to stop async-load-mode before video capture actully begin
+	// tell render eigine to stop async-load-mode before video capture actully begin 
 	// by doing so we can avoid capturing only a partial items of a scene  
 	// get the previous AsynChunkMode value to bPreAsynChunkModeValue 
 	bool bPreAsyncChunkModeValue = true;
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Get(pBlockEngine, &bPreAsyncChunkModeValue);
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, false);
 
+	// tell render eigine to stop AsyncLoading before video capture actully begin
+	// to avoid flickering when a model is first loaded 
+	// get the previous AsynChunkMode value to bPreAsynChunkModeValue 
+	bool bPreAsyncLoadingValue = true;
+	pAssetManager->GetAttributeClass()->GetField("AsyncLoading")->Get(pAssetManager, &bPreAsyncLoadingValue);
+	pAssetManager->GetAttributeClass()->GetField("AsyncLoading")->Set(pAssetManager, false);
+
+	// pasuse the game 
 	pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, true);
+	
 
 	// get current frame number
 	int nCurrentFrameNum = 0;
@@ -506,7 +518,13 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 	bool firstCaptureFrame = true;
 	int lastTime = 0;
 	pGameFRC->GetAttributeClass()->GetField("Time")->Get(pGameFRC, &lastTime);
+
+	// NOTE: when 1000 cannot be divided by m_nRecordingFPS with no remainder 
+	// we lose accuracy significantly
 	const int deltaTime = (1000.0 / (double)m_nRecordingFPS);
+	const int remainder = 1000 % m_nRecordingFPS;
+	int timeToMakeUp = 1;
+	int rem = m_nRecordingFPS % remainder;
 	for (UINT32 nPasses = 0; !bDone; nPasses++){
 		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
 
@@ -530,10 +548,12 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			int nItemsLeft = -1, nDirtyBlockCount = -1;
 			pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 			pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
-
-			// advance game to next frame 
 			pScene->GetAttributeClass()->GetField("FrameNumber")->Get(pScene, &nCurrentFrameNum);
+
+			// advance game to next frame 	
 			lastTime += deltaTime;
+			// the FPS is 60 according to our current settings, it may change, beware of it 
+			if (((nPasses + 1) % 3) == 0)lastTime += 2;
 			pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
 			// wait render engine to finish current frame 
 			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrrameNum)){
@@ -567,6 +587,8 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 	// set back previous AsynChunkMode value when we finish capturing video
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, bPreAsyncChunkModeValue);
+	// set back previous AsyncLoading value when we finish capturing video
+	pAssetManager->GetAttributeClass()->GetField("AsyncLoading")->Set(pAssetManager, bPreAsyncLoadingValue);
 	// resume the game
 	pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, false);
 }
@@ -691,7 +713,6 @@ int ParaEngine::MovieCodec::BeginCapture(const char *filename, HWND nHwnd, int n
 	m_bIsBegin = true;
 	return 0;
 }
-
 
 DWORD ParaEngine::MovieCodec::EncodingThreadFunction()
 {
