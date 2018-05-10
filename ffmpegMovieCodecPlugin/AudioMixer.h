@@ -12,6 +12,7 @@ struct AVFilterContext;
 struct AVFrame;
 struct AVPacket;
 struct AVStream;
+struct AVFilterGraph;
 
 namespace ParaEngine {
 	class MovieCodec;
@@ -55,23 +56,33 @@ private:
 		AVCodecContext* outputCodecContext);
 	int InitInputFrame(AVFrame **frame);
 	void InitPacket(AVPacket *packet);
+	void CleanUp();
+
 private:
+	// ablout input audios 
 	std::vector<AudioFile> m_Audios;
 	std::vector<AVCodecContext*> m_pInputCodecContexts;
 	std::vector<AVFormatContext*> m_pInputFormatContexts;
-	std::vector<AVFilterContext*> m_pBufferFilterContexts;
-	std::vector<AVFilterContext*> m_pDelayFilterContexts;
-	AVFilterContext* m_pBuffersinkFilterContext;
 	AVFormatContext* m_pOutputFormatContext;
 	AVOutputFormat* m_pOutputFormat;
 	SwrContext* m_pSWRctx;
-
 	AVStream* m_pAudioStream;
 	AVCodecContext* m_pAudioEncoderContext;
 	AVCodec* m_pAudioCoder;
 
+	// filters
+	std::vector<AVFilterContext*> m_pBufferFilterContexts;
+	std::vector<AVFilterContext*> m_pDelayFilterContexts;
+	AVFilterContext* m_pBuffersinkFilterContext;
+	AVFilterContext* m_pMixFilterContext;
+	AVFilterGraph* m_pFilterGraph;
+
+	// record the frame number when capture starts 
 	unsigned long m_nCaptureStartFrameNum;
 
+	uint8_t* m_pConvertedDataBuffer;
+
+	// a reference to MovieCodec instance for current FPS
 	ParaEngine::MovieCodec* _movieCodec;
 };
 
