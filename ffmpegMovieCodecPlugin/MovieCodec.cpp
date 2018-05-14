@@ -493,21 +493,21 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 	auto pAssetManager = pParaEngine->GetChildAttributeObject(0);
 	
 
-	// tell render eigine to stop async-load-mode before video capture actully begin 
+	// tell render engine to stop async-load-mode before video capture actually begin 
 	// by doing so we can avoid capturing only a partial items of a scene  
 	// get the previous AsynChunkMode value to bPreAsynChunkModeValue 
 	bool bPreAsyncChunkModeValue = true;
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Get(pBlockEngine, &bPreAsyncChunkModeValue);
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, false);
 
-	// tell render eigine to stop AsyncLoading before video capture actully begin
+	// tell render engine to stop AsyncLoading before video capture actually begin
 	// to avoid flickering when a model is first loaded 
 	// get the previous AsynChunkMode value to bPreAsynChunkModeValue 
 	bool bPreAsyncLoadingValue = true;
 	pAssetManager->GetAttributeClass()->GetField("AsyncLoading")->Get(pAssetManager, &bPreAsyncLoadingValue);
 	pAssetManager->GetAttributeClass()->GetField("AsyncLoading")->Set(pAssetManager, false);
 
-	// pasuse the game 
+	// pause the game 
 	pGameFRC->GetAttributeClass()->GetField("Paused")->Set(pGameFRC, true);
 	
 

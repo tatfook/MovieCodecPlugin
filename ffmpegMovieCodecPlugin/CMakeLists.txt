@@ -78,7 +78,21 @@ SET(CMAKE_DEBUG_POSTFIX "_d")
 
 link_directories("${ffmpeg_Root}/lib/")
 
-link_libraries(MovieCodecPlugin libavfilter libavcodec libavutil libavformat libswscale libswresample libpostproc advapi32 libx264 mp3lame bcrypt Winmm Avrt)
+link_libraries(MovieCodecPlugin 
+	libavfilter 
+	libavcodec 
+	libavutil 
+	libavformat 
+	libswscale 
+	libswresample 
+	libpostproc 
+	advapi32 
+	libx264 
+	mp3lame 
+	bcrypt 
+	Winmm 
+	Avrt
+)
 
 # add the executable
 add_library(MovieCodecPlugin SHARED ${MovieCodecPlugin_SRCS})
@@ -95,9 +109,9 @@ if(MSVC)
 	STRING(REGEX REPLACE "^.*[/\\]([^/\\]+)$" "\\1" RELEASE_EXE_NAME "${RELEASE_EXE_PATH}" )
 
 	if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
-		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl_dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
+		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/bin64"  )
 	else()
-		set( OUTPUT_BIN_DIR "D:\Projects\3rdParty\npl_dev\NPLRuntime\Client\build\lib\Release\Mod\MovieCodecPlugin" )
+		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/" )
 	endif()
 
 	ADD_CUSTOM_COMMAND(
