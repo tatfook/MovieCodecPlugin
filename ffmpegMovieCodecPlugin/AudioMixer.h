@@ -18,8 +18,6 @@ namespace ParaEngine {
 	class MovieCodec;
 }
 
-
-// Merge multi audio file(s) into ine single file.
 struct AudioFile
 {
 	AudioFile(std::string file, float s, float e)
@@ -33,6 +31,11 @@ struct AudioFile
 };
 typedef std::vector<AudioFile> AudioFiles;
 
+/** 
+This class merges multi audio streams (.wav, .au etc.) inputs into a single one.
+NOTE:If your audio stream is for example longer than the video stream, you have to cut it or otherwise you will have the last 
+video frame as a still image and audio running.
+*/
 class AudioMixer
 {
 public:
@@ -59,7 +62,7 @@ private:
 	void CleanUp();
 
 private:
-	// ablout input audios 
+	// about input audios 
 	std::vector<AudioFile> m_Audios;
 	std::vector<AVCodecContext*> m_pInputCodecContexts;
 	std::vector<AVFormatContext*> m_pInputFormatContexts;
