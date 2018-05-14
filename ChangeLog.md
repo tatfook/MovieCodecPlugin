@@ -9,4 +9,4 @@ All notable changes to this project will be documented in this file.
 
 ### Deatails for Developers
 - Add new class AudioMixer. AudioMixer merges multi audio streams (.wav, .au etc.) inputs into a single one with proper delay(s). If your audio stream is for example longer than the video stream, you have to cut it or otherwise you will have the last video frame as a still image and audio running. 
-- Add static win32 ffmpeg libs in ./x86 folder. We now can release our MovieCodecPlugin with just one DLL file with no prebuild dll files anymore.
+- Add static win32 ffmpeg libs in ./x86 folder. We now can release our MovieCodecPlugin with just one DLL file, no prebuild dll files anymore.
