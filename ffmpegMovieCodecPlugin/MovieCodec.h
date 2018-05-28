@@ -18,6 +18,8 @@ struct AVRational;
 struct AVOutputFormat;
 struct SwrContext;
 
+class AudioMixer;
+
 namespace ParaEngine
 {
 	class CAudioCapture;
@@ -56,7 +58,7 @@ namespace ParaEngine
 		virtual int encode_video_frame_data_async(const BYTE* pData, int nDataSize = 0, int* pnFrameCount = 0);
 
 		/** end recording for the current file. */
-		virtual int EndCapture();
+		virtual int EndCapture(std::string auidoMap = "");
 
 		/** is recording */
 		virtual bool IsRecording();
@@ -114,16 +116,21 @@ namespace ParaEngine
 
 		void DuplicateLastFrame();
 
+		int GetRecordingFPS();
+
 		void SetErrorCode(int nErrorCode = 1){ m_nLastError = nErrorCode; };
+
 	private:
 		AVStream *add_stream(AVFormatContext *oc, AVCodec **codec, int codec_id);
 		int open_video(AVFormatContext *oc, AVCodec *codec, AVStream *st);
 		void close_video(AVFormatContext *oc, AVStream *st);
 		int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt);
-		
 		int open_audio(AVFormatContext *oc, AVCodec *codec, AVStream *st);
 		void close_audio(AVFormatContext *oc, AVStream *st);
-		
+
+		void CaptureThreadFunctionCaptureLoopOriginal();
+		void CaptureThreadFunctionCaptureLoop1080P();
+	
 	private:
 		/** Video capture mode	*/
 		MOVIE_CAPTURE_MODE m_nStereoCaptureMode;
@@ -208,6 +215,10 @@ namespace ParaEngine
 		bool m_bCaptureMouse;
 		std::vector<BYTE> g_buffer[2];
 		int m_nLastBitmapByteCount;
-		
+
+		// add by Cheng Yuanchu in May 8th, 2018 
+		std::string m_strAudioMap;
+		AudioMixer* m_AudioMixer;
+		unsigned int m_nFrameIndex;
 	};
 }
