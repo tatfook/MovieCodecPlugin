@@ -5,7 +5,7 @@
 # add environment variable NPLRUNTIME_ROOT that point to git root of NPLRuntime.
 
 # NOTE: modify the root directory path if it is installed at a different location. 
-set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg20140501Compiled)
+set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
@@ -35,6 +35,8 @@ SET(MovieCodecPlugin_SRCS
 	AudioCapture.cpp
 	CaptureFrameData.h
 	CaptureFrameData.cpp
+	AudioMixer.h
+	AudioMixer.cpp
 	readme.txt
 	AddCompileLinkFlags.cmake
 )
@@ -62,7 +64,7 @@ IF(MSVC)
 	SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /GR-")
 	SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
 	# add a stripped version of symbol files during release build
-	SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LARGEADDRESSAWARE /opt:ref /DEBUG /PDBSTRIPPED:Release/MovieCodecPlugin.stripped.pdb")
+	#SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LARGEADDRESSAWARE /opt:ref /DEBUG /PDBSTRIPPED:Release/MovieCodecPlugin.stripped.pdb")
 ENDIF()
 
 
@@ -76,7 +78,21 @@ SET(CMAKE_DEBUG_POSTFIX "_d")
 
 link_directories("${ffmpeg_Root}/lib/")
 
-link_libraries(MovieCodecPlugin  avcodec avutil avformat swscale swresample Winmm Avrt)
+link_libraries(MovieCodecPlugin 
+	libavfilter 
+	libavcodec 
+	libavutil 
+	libavformat 
+	libswscale 
+	libswresample 
+	libpostproc 
+	advapi32 
+	libx264 
+	mp3lame 
+	bcrypt 
+	Winmm 
+	Avrt
+)
 
 # add the executable
 add_library(MovieCodecPlugin SHARED ${MovieCodecPlugin_SRCS})
@@ -93,7 +109,7 @@ if(MSVC)
 	STRING(REGEX REPLACE "^.*[/\\]([^/\\]+)$" "\\1" RELEASE_EXE_NAME "${RELEASE_EXE_PATH}" )
 
 	if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
-		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/bin64/" )
+		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/bin64"  )
 	else()
 		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/" )
 	endif()
@@ -101,7 +117,6 @@ if(MSVC)
 	ADD_CUSTOM_COMMAND(
 	   TARGET MovieCodecPlugin
 	   POST_BUILD
-	   COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_BIN_DIR}
 	   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:MovieCodecPlugin> ${OUTPUT_BIN_DIR}
 	)
 
