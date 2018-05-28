@@ -32,7 +32,7 @@ struct AudioFile
 typedef std::vector<AudioFile> AudioFiles;
 
 /** 
-This class merges multi audio streams (.wav, .au etc.) inputs into a single one.
+This class merges multi audio streams (.wav, .au etc.) inputs into a single one with proper delay(s).
 NOTE:If your audio stream is for example longer than the video stream, you have to cut it or otherwise you will have the last 
 video frame as a still image and audio running.
 */

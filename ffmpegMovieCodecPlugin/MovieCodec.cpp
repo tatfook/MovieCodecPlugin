@@ -186,21 +186,17 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	m_video_st = NULL;
 	m_audio_st = NULL;
 	m_nLastLostVideoFrame = -1;
-	// set default codec as H.264
+	// set default video codec as H.264
 	m_pOutputFormat->video_codec = AV_CODEC_ID_H264;
+	// set default audio codec as MP3
 	m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
 	m_video_st = add_stream(m_pFormatContext, &m_video_codec, m_pOutputFormat->video_codec);
 	
 	if (IsCaptureAudio() && m_pOutputFormat->audio_codec != AV_CODEC_ID_NONE)
 	{
-		/* prefer AAC over mp3. mp3 will lead to failure to open the file. i do not know why*/
-		//if (m_pOutputFormat->audio_codec == AV_CODEC_ID_MP3)
-		//	m_pOutputFormat->audio_codec = AV_CODEC_ID_AAC;
  		if (m_pAudioCapture->BeginCaptureInThread() == 0)
 		{
 			m_nLastLeftDataCount = 0;
-			// move dudio staff to AudioMixer class
-
 			if (m_nHeight + 2*m_nLeft >= 1000) {// 1080p, why 1000? because m_nHeight = ((int)(height / 16)) * 16;
 				m_AudioMixer = new AudioMixer(m_pFormatContext, this);
 			}else{
@@ -523,8 +519,10 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 	// we lose accuracy significantly
 	const int deltaTime = (1000.0 / (double)m_nRecordingFPS);
 	const int remainder = 1000 % m_nRecordingFPS;
-	int timeToMakeUp = 1;
-	int rem = m_nRecordingFPS % remainder;
+	int remFPSlcm = remainder * m_nRecordingFPS / av_gcd(remainder, m_nRecordingFPS);
+	int timeToMakeUp = remFPSlcm / m_nRecordingFPS;
+	int period = 1;
+	if(remainder > 0)period = remFPSlcm / remainder;
 	for (UINT32 nPasses = 0; !bDone; nPasses++){
 		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
 
@@ -552,13 +550,12 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 			// advance game to next frame 	
 			lastTime += deltaTime;
-			// the FPS is 60 according to our current settings, it may change, beware of it 
-			if (((nPasses + 1) % 3) == 0)lastTime += 2;
+			if (((nPasses + 1) % period) == 0)lastTime += timeToMakeUp;
 			pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
 			// wait render engine to finish current frame 
 			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrrameNum)){
-				// nItemsLeft or nDirtyBlockCount bigger than 0 implys the engine has not finished rendering the current scene yet
-				std::this_thread::sleep_for(std::chrono::milliseconds(20));
+				// nItemsLeft or nDirtyBlockCount bigger than 0 implies the engine has not finished rendering the current scene yet
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
 				nItemsLeft = -1, nDirtyBlockCount = -1;
 				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
@@ -579,7 +576,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				}
 			}
 			nLastFrrameNum = nCurrentFrameNum;
-			std::this_thread::sleep_for(std::chrono::milliseconds(25));
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}// end for loop
 
@@ -684,11 +681,13 @@ int ParaEngine::MovieCodec::BeginCapture(const char *filename, HWND nHwnd, int n
 		m_nRecordingFPS = m_nFPS;
 	if (width > 0)
 	{
-		m_nWidth = ((int)(width / 16)) * 16;
+	//	m_nWidth = ((int)(width / 16)) * 16;
+		m_nWidth = width;
 	}
 	if (height > 0)
 	{
-		m_nHeight = ((int)(height / 16)) * 16;
+	//	m_nHeight = ((int)(height / 16)) * 16;
+		m_nHeight = height;
 	}
 
 	m_filename = filename;
