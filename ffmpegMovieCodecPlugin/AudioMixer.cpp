@@ -279,6 +279,7 @@ void AudioMixer::InitFilerGraph(int chanels)
 
 void AudioMixer::ProcessInputAudios()
 {
+	OUTPUT_LOG("Error: Start  ProcessInputAudios  value \n");
 	if (m_Audios.empty()) return;
 	AudioFiles filteredFiles;
 	// open all the input 
@@ -583,7 +584,7 @@ void AudioMixer::InitPacket(AVPacket *packet)
 void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 {
 	m_Audios.clear();
-	
+	OUTPUT_LOG("Error: Start  ParseAudioFiles  value \n");
 	std::regex re(",");
 	std::sregex_token_iterator
 		first{ rawdata.begin(), rawdata.end(), re, -1 },
