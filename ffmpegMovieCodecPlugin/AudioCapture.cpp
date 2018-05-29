@@ -1,6 +1,7 @@
 #include "stdafx.h"
-#include <vector>
 #include "AudioCapture.h"
+
+#include <vector>
 
 using namespace ParaEngine;
 
