@@ -517,15 +517,15 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 	// NOTE: when 1000 cannot be divided by m_nRecordingFPS with no remainder 
 	// we lose accuracy significantly
+	int period = 1;
 	const int deltaTime = (1000.0 / (double)m_nRecordingFPS);
 	const int remainder = 1000 % m_nRecordingFPS;
-	int remFPSlcm = remainder * m_nRecordingFPS / av_gcd(remainder, m_nRecordingFPS);
-	int timeToMakeUp = remFPSlcm / m_nRecordingFPS;
-	int period = 1;
-	if(remainder > 0)period = remFPSlcm / remainder;
+	// least common multiplier of remainder and FPS
+	int remainderFPSlcm = remainder * m_nRecordingFPS / av_gcd(remainder, m_nRecordingFPS);
+	int timeToMakeUp = remainderFPSlcm / m_nRecordingFPS;
+	if(remainder > 0)period = remainderFPSlcm / remainder;
 	for (UINT32 nPasses = 0; !bDone; nPasses++){
 		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
-
 		if (m_bStopEvent) {
 			OUTPUT_LOG("Received stop event after %d frames\n", m_nCurrentFrame);
 			bDone = true;
@@ -555,7 +555,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			// wait render engine to finish current frame 
 			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrrameNum)){
 				// nItemsLeft or nDirtyBlockCount bigger than 0 implies the engine has not finished rendering the current scene yet
-				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+				std::this_thread::sleep_for(std::chrono::milliseconds(25));
 				nItemsLeft = -1, nDirtyBlockCount = -1;
 				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
@@ -576,7 +576,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				}
 			}
 			nLastFrrameNum = nCurrentFrameNum;
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			std::this_thread::sleep_for(std::chrono::milliseconds(25));
 		}
 	}// end for loop
 
