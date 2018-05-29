@@ -37,6 +37,8 @@ SET(MovieCodecPlugin_SRCS
 	CaptureFrameData.cpp
 	AudioMixer.h
 	AudioMixer.cpp
+	AudioRecordAudioFromMicrophone.h
+	AudioRecordAudioFromMicrophone.cpp
 	readme.txt
 	AddCompileLinkFlags.cmake
 )
