@@ -1,12 +1,12 @@
 #pragma once
 #include <string>
 
-class AudioRecorder
+class AudioRecordAudioFromMicrophone
 {
 public:
-	AudioRecorder();
+	AudioRecordAudioFromMicrophone();
 
-	~AudioRecorder();
+	~AudioRecordAudioFromMicrophone();
 
 	void Start( const char* fileName );
 
