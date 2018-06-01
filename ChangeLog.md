@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2018-05-30 Cheng Yuanchu <sleepybuffer@gmail.com>
+
+### Added
+- MCI interface implementation which enables Paracaft to record sound from microphone input
+- Add mp3 output format to MovieCodecPlugin. Now you can export audio file if you like
+
+### Deatails for Developers
+- Add new class AudioRecordAudioFromMicrophone which wraps MCI interface 
+
 ## [1.0.0] - 2018-05-14 Cheng Yuanchu <sleepybuffer@gmail.com>
 
 ### Added
