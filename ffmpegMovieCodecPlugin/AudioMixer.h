@@ -20,7 +20,7 @@ namespace ParaEngine {
 
 struct AudioFile
 {
-	AudioFile(std::string file, float s, float e)
+	AudioFile(std::string file, unsigned int s, unsigned int e)
 		:m_strFileName(file)
 		, m_nStartFrameNum(s)
 		, m_nEndFrameNum(e)
@@ -46,7 +46,7 @@ public:
 
 	bool Mix();
 
-	void SetCaptureStartFrameNum(unsigned int );
+	void SetCaptureStartTime(unsigned int );
 
 private:
 	void InitResampleSettings(AVFormatContext* pInputFormatContext);
@@ -81,7 +81,7 @@ private:
 	AVFilterGraph* m_pFilterGraph;
 
 	// record the frame number when capture starts 
-	unsigned long m_nCaptureStartFrameNum;
+	unsigned long m_nCaptureStartTime;
 
 	uint8_t* m_pConvertedDataBuffer;
 
