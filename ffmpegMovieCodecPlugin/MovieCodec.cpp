@@ -552,10 +552,15 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			lastTime += deltaTime;
 			if (((nPasses + 1) % period) == 0)lastTime += timeToMakeUp;
 			pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
+			if (firstCaptureFrame) {
+				m_AudioMixer->SetCaptureStartTime(lastTime);
+				OUTPUT_LOG("Capture starting time: %d!\n", lastTime);
+				firstCaptureFrame = false;
+			}
 			// wait render engine to finish current frame 
 			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrameNum)){
 				// nItemsLeft or nDirtyBlockCount bigger than 0 implies the engine has not finished rendering the current scene yet
-				std::this_thread::sleep_for(std::chrono::milliseconds(25));
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				nItemsLeft = -1, nDirtyBlockCount = -1;
 				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
@@ -566,11 +571,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				bDone = true;
 				continue; // exits loop
 			}else{
-				nFrameCount++;
-				if (firstCaptureFrame) {
-					m_AudioMixer->SetCaptureStartTime(lastTime);
-					firstCaptureFrame = false;
-				}
+				nFrameCount++;	
 			}
 			nLastFrameNum = nCurrentFrameNum;
 			std::this_thread::sleep_for(std::chrono::milliseconds(25));
