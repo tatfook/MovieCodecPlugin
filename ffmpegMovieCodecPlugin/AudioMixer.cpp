@@ -328,27 +328,6 @@ void AudioMixer::InitFilerGraph(int chanels)
 
 void AudioMixer::ProcessInputAudios()
 {
-	//m_Audios.clear();
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/bj.mp3", 1000, 0));
-	////m_Audios.push_back(AudioFile("D:/Projects/3rdParty/npl_dev/NPLRuntime/Client/build/lib/Release/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/1.mp3", 2000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/bj3.mp3", 4000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/bj4.mp3", 7000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/2.mp3", 3500, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/3.mp3", 4000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/21.mp3", 5000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/22.mp3", 6000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/23.mp3", 7000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/24.mp3", 8000, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/1.ogg", 20677, 0));
-	////m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/10.ogg", 28303, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/11.ogg", 29232, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/12.ogg", 33087, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/13.ogg", 21571, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/14xz1.ogg", 20664, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/16.wav", 30871, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/9.wav", 26169, 0));
-	//m_Audios.push_back(AudioFile("D:/Projects/Paracraft__/worlds/DesignHouse/ﾔｲｵﾄｹﾊﾊﾂ2/91.wav", 26025, 0));
-
 	if (m_Audios.empty()) return;
 	AudioFiles filteredFiles;
 	OUTPUT_LOG("Total input files: %d \n", m_Audios.size());
@@ -473,6 +452,7 @@ void AudioMixer::ProcessInputAudios()
 		&pi)           // Pointer to PROCESS_INFORMATION structure
 		) {
 		OUTPUT_LOG("Failed to call ffmpeg.exe!\n");
+		return;
 	}
 	// Wait until child process exits.
 	WaitForSingleObject(pi.hProcess, INFINITE);
