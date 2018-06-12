@@ -1,10 +1,6 @@
 #include"AudioMixer.h"
 #include"stdafx.h"
 
-#include <stdio.h>
-#include<regex>
-#include<algorithm>
-
 extern "C"
 {
 
@@ -35,7 +31,46 @@ extern "C"
 
 #include"MovieCodec.h"
 
+#include <stdio.h>
+#include<regex>
+#include<algorithm>
+#include<locale>
+#include<codecvt>
+
 using namespace ParaEngine;
+
+void UTF8_to_GB2312(const char* utf8, string& gb2312_str)
+{
+	int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	wchar_t* wstr = new wchar_t[len + 1];
+	memset(wstr, 0, len + 1);
+	MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wstr, len);
+	len = WideCharToMultiByte(CP_ACP, 0, wstr, -1, NULL, 0, NULL, NULL);
+	char* str = new char[len + 1];
+	memset(str, 0, len + 1);
+	WideCharToMultiByte(CP_ACP, 0, wstr, -1, str, len, NULL, NULL);
+	delete[] wstr;
+	gb2312_str = str;
+	delete[] str;
+	return;
+}
+
+void GB2312_to_UTF8(const char* gb2312, wstring& utf8_str)
+{
+	int len = MultiByteToWideChar(CP_ACP, 0, gb2312, -1, NULL, 0);
+	wchar_t* wstr = new wchar_t[len + 1];
+	memset(wstr, 0, len + 1);
+	MultiByteToWideChar(CP_ACP, 0, gb2312, -1, wstr, len);
+	utf8_str = wstr;
+	//len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+	//char* str = new char[len + 1];
+	//memset(str, 0, len + 1);
+	//WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, len, NULL, NULL);
+	delete[] wstr;
+	//utf8_str = str;
+	//delete[] str;
+	return;
+}
 
 AudioMixer::AudioMixer(AVFormatContext* fmtCtx, ParaEngine::MovieCodec* movieCodec)
 	: m_pOutputFormatContext(fmtCtx)
@@ -150,6 +185,7 @@ void AudioMixer::InitFilerGraph(int chanels)
 	
 	m_pBufferFilterContexts.resize(chanels);
 	m_pDelayFilterContexts.resize(chanels);
+	char args[512];
 	for (int i = 0; i < chanels; ++i) {
 		if (!m_pInputFormatContexts[i])continue;
 		const AVFilter* buffer = avfilter_get_by_name("abuffer");
@@ -160,9 +196,8 @@ void AudioMixer::InitFilerGraph(int chanels)
 		// buffer audio source: the decoded and converted frames from the decoder and decoder will be inserted here.
 		if (!m_pAudioEncoderContext->channel_layout)
 			m_pInputCodecContexts[i]->channel_layout = av_get_default_channel_layout(m_pInputCodecContexts[i]->channels);
-		char name[8] = {'s','r','c'};
-		itoa(i, &name[3], 10);
-		char args[512];
+		char name[16];
+		snprintf(name, sizeof(name), "src%d", i);
 		snprintf(args, sizeof(args),
 			"sample_rate=%d:sample_fmt=%s:channel_layout=0x%d",
 			m_pAudioEncoderContext->sample_rate,
@@ -182,38 +217,45 @@ void AudioMixer::InitFilerGraph(int chanels)
 			return;// note: mem leak
 		}
 		// Beware of this filter's args
-		std::string argsstr;
-		char digits[32];
-		memset(digits, 0, 32);
-		int timeLapse = ((float)(m_Audios[i].m_nStartFrameNum - m_nCaptureStartFrameNum)/ (float)_movieCodec->GetRecordingFPS())*1000;
+		int timeLapse = m_Audios[i].m_nStartFrameNum - m_nCaptureStartTime;
 		if (timeLapse < 0) {
 			std::string msg = m_Audios[i].m_strFileName + " has played before caputre!\n";
 			OUTPUT_LOG(msg.c_str());
 			timeLapse = 0;
 		}
-		itoa(timeLapse, digits, 10);
-		argsstr.append(digits);
-		argsstr += "|";
-		argsstr.append(digits);
+
 		// Remove the last "|" symbol.
+		snprintf(args, sizeof(args),"%d|%d", timeLapse, timeLapse);
 		avfilter_graph_create_filter(&m_pDelayFilterContexts[i], pDelayFilter, "adelay",
-			argsstr.c_str(), NULL, filterGraph);
+			args, NULL, filterGraph);
 	}
 
 	// Create mix filter.
-	const AVFilter* pMixFilter = avfilter_get_by_name("amerge");
+	const AVFilter* pMixFilter = avfilter_get_by_name("amix");
 	if (!pMixFilter) {
 		OUTPUT_LOG("Could not find the mix filter!\n");
 		return;// note: mem leak
 	}
-	std::string args("inputs=");
-	char digits[8];
-	itoa(chanels, digits, 8);
-	args += digits;
-	avfilter_graph_create_filter(&m_pMixFilterContext, pMixFilter, "amerge",
-		args.c_str(), NULL, filterGraph);
 
-	
+	snprintf(args, sizeof(args), "inputs=%d:duration=longest:dropout_transition=0", chanels);
+	avfilter_graph_create_filter(&m_pMixFilterContext, pMixFilter, "amix", args, NULL, filterGraph);
+	OUTPUT_LOG("Total amerge input : %d \n", chanels);
+
+	// Create afomat filter
+	const AVFilter* pAformatFilter = avfilter_get_by_name("aformat");
+	if (!pAformatFilter) {
+		OUTPUT_LOG("Could not find the aformat filter!\n");
+		return;// note: mem leak
+	}
+	AVFilterContext* pAformatFilterContext = nullptr;
+	snprintf(args, sizeof(args), "sample_fmts=%s:sample_rates=%d:channel_layouts=%d",
+		av_get_sample_fmt_name(m_pAudioEncoderContext->sample_fmt),
+		m_pAudioEncoderContext->sample_rate, m_pAudioEncoderContext->channel_layout);
+	avfilter_graph_create_filter(&pAformatFilterContext, pAformatFilter, "aformat", args, NULL, filterGraph);
+	if (!pAformatFilterContext) {
+		OUTPUT_LOG("Could not create the aformat filter context!\n");
+		return;// note: mem leak
+	}
 
 	// Finally create the abuffersink filter to buffer audio frames, and make them available to the end of filter chain.
 	const AVFilter* pBuffersinkFilter = avfilter_get_by_name("abuffersink");
@@ -227,22 +269,23 @@ void AudioMixer::InitFilerGraph(int chanels)
 		return;// note: mem leak
 	}
 
-	// Same sample fmts as the output file. */
-	AVSampleFormat FMT[2] = { m_pAudioCoder->sample_fmts[0], AV_SAMPLE_FMT_NONE };
-	int ret = av_opt_set_int_list(m_pBuffersinkFilterContext,
-		"sample_fmts",
-		FMT,
-		AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
-	if (ret < 0) {
-		OUTPUT_LOG("Could set options to the abuffersink instance!\n");
-		return;// note: mem leak
-	}
 
-	char ch_layout[64];
-	av_get_channel_layout_string(ch_layout, sizeof(ch_layout), 0, m_Audios.size());
-	av_opt_set(m_pBuffersinkFilterContext, "channel_layout", ch_layout, AV_OPT_SEARCH_CHILDREN);
+	//// Same sample fmts as the output file. */
+	//AVSampleFormat FMT[2] = { m_pAudioCoder->sample_fmts[0], AV_SAMPLE_FMT_NONE };
+	//int ret = av_opt_set_int_list(m_pBuffersinkFilterContext,
+	//	"sample_fmts",
+	//	FMT,
+	//	AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+	//if (ret < 0) {
+	//	OUTPUT_LOG("Could set options to the abuffersink instance!\n");
+	//	return;// note: mem leak
+	//}
+	//
+	//char ch_layout[64];
+	//av_get_channel_layout_string(ch_layout, sizeof(ch_layout), 0, m_Audios.size());
+	//av_opt_set(m_pBuffersinkFilterContext, "channel_layout", ch_layout, AV_OPT_SEARCH_CHILDREN);
 
-	ret = avfilter_init_str(m_pBuffersinkFilterContext, NULL);
+	int ret = avfilter_init_str(m_pBuffersinkFilterContext, NULL);
 	if (ret < 0) {
 		OUTPUT_LOG("Could not initialize the abuffersink instance!\n");
 		return;// note: mem leak
@@ -263,9 +306,15 @@ void AudioMixer::InitFilerGraph(int chanels)
 		}
 	}
 
-	ret = avfilter_link(m_pMixFilterContext, 0, m_pBuffersinkFilterContext, 0);
+	ret = avfilter_link(m_pMixFilterContext, 0, pAformatFilterContext, 0);
 	if (ret < 0) {
-		OUTPUT_LOG("Could not link the mix filter to buffersink filter!\n");
+		OUTPUT_LOG("Could not link the mix filter to aformat filter!\n");
+		return;// note: mem leak
+	}
+
+	ret = avfilter_link(pAformatFilterContext, 0, m_pBuffersinkFilterContext, 0);
+	if (ret < 0) {
+		OUTPUT_LOG("Could not link the aformat filter to buffersink filter!\n");
 		return;// note: mem leak
 	}
 
@@ -279,9 +328,9 @@ void AudioMixer::InitFilerGraph(int chanels)
 
 void AudioMixer::ProcessInputAudios()
 {
-	OUTPUT_LOG("Error: Start  ProcessInputAudios  value \n");
 	if (m_Audios.empty()) return;
 	AudioFiles filteredFiles;
+	OUTPUT_LOG("Total input files: %d \n", m_Audios.size());
 	// open all the input 
 	for (int i = 0; i < m_Audios.size(); ++i) {
 		AVFormatContext* pInputFormatContext = nullptr;
@@ -289,9 +338,10 @@ void AudioMixer::ProcessInputAudios()
 
 		int ret = avformat_open_input(&pInputFormatContext, m_Audios[i].m_strFileName.c_str(), NULL, NULL);
 		if (ret < 0) {
-			OUTPUT_LOG("Could not open input file '%d', i\n");
+			OUTPUT_LOG("Could not open input file %s \n", m_Audios[i].m_strFileName.c_str());
 			continue;// NOTE: what if if it failed?
 		}
+		OUTPUT_LOG("Open input file %s, startFrame: %d  \n", m_Audios[i].m_strFileName.c_str(), m_Audios[i].m_nStartFrameNum);
 
 		// Get information on the input file (number of streams etc.).
 		if (avformat_find_stream_info(pInputFormatContext, NULL) < 0) {
@@ -314,13 +364,105 @@ void AudioMixer::ProcessInputAudios()
 			avformat_close_input(&pInputFormatContext);
 			continue;// NOTE: what if if it failed?
 		}
-
+		avformat_close_input(&pInputFormatContext);
 		filteredFiles.push_back(m_Audios[i]);
 	}// end for
-
+	OUTPUT_LOG("Total opened input files: %d \n", filteredFiles.size());
 	m_Audios = filteredFiles;
 	filteredFiles.clear();
 	if (m_Audios.size() < 1) return;
+
+	// test call for ffmpeg.exe
+	// test start
+	std::string inputCommand;
+	for (int i = 0; i < m_Audios.size(); ++i) {
+		inputCommand += " -i ";
+		inputCommand += m_Audios[i].m_strFileName;
+	}
+	OUTPUT_LOG("Input:%s\n",inputCommand.c_str());
+	
+	char* labels[32] = {
+		"[a]","[b]","[c]","[d]",
+		"[e]","[f]","[g]","[h]",
+		"[i]","[j]","[k]","[l]",
+		"[m]","[n]","[o]","[p]",
+		"[q]","[r]","[s]","[t]",
+		"[u]","[v]","[w]","[x]",
+		"[y]","[z]","[aa]","[bb]",
+		"[cc]","[dd]","[ff]","[ee]"
+	};
+	std::string filterChains;
+	for (int i = 0; i < m_Audios.size(); ++i) {
+		int timeLapse = m_Audios[i].m_nStartFrameNum - m_nCaptureStartTime;
+		if (timeLapse < 0) timeLapse = 0;
+		char chain[32];
+		snprintf(chain, sizeof(chain), "[%d]adelay=%d|%d%s;", i, timeLapse, timeLapse, labels[i]);
+		filterChains += chain;
+	}
+	OUTPUT_LOG("filterChains:%s\n", filterChains.c_str());
+	
+	std::string mixConmand (" ");
+	for (int i = 0; i < m_Audios.size(); ++i) {
+		mixConmand += labels[i];
+	}
+	char amix[16];
+	snprintf(amix, sizeof(amix), "amix=%d\" ", m_Audios.size());
+	mixConmand += amix;
+	OUTPUT_LOG("mixConmand:%s\n", mixConmand.c_str());
+	
+	// output file name
+	char filePath[256];
+	int nNum = snprintf(filePath, sizeof(filePath), "%s", m_Audios[0].m_strFileName.c_str());
+	for (int i = 0; i < 256; ++i) {
+		if (filePath[i] == '.') {
+			char temt[] = "temp.mp3";
+			memcpy(filePath + i, temt, sizeof(temt));
+			break;
+		}
+	}
+	//std::string tempOutputFileName = std::filesystem::path(filePath).replace_filename("temp.mp3").string();
+	OUTPUT_LOG("tempOutputFileName:%s\n", filePath);
+	
+	// Assemble commands
+	std::string commands("ffmpeg.exe ");
+	commands += inputCommand;
+	commands += " -filter_complex \"";
+	commands += filterChains;
+	commands += mixConmand;
+	commands += filePath;
+	OUTPUT_LOG(commands.c_str());
+	char commandSet[1024*16];
+	snprintf(commandSet, sizeof(commandSet), "%s", commands.c_str());
+	
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+	// Start the child process. 
+	if (!CreateProcess(NULL,   // No module name (use command line)
+		commandSet,        // Command line
+		NULL,           // Process handle not inheritable
+		NULL,           // Thread handle not inheritable
+		FALSE,          // Set handle inheritance to FALSE
+		CREATE_NO_WINDOW,              // No creation flags
+		NULL,           // Use parent's environment block
+		NULL,           // Use parent's starting directory 
+		&si,            // Pointer to STARTUPINFO structure
+		&pi)           // Pointer to PROCESS_INFORMATION structure
+		) {
+		OUTPUT_LOG("Failed to call ffmpeg.exe!\n");
+		return;
+	}
+	// Wait until child process exits.
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	// Close process and thread handles. 
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	m_Audios.clear();
+	m_Audios.push_back(AudioFile(filePath, 0, 0));
+	// test end
+
 	m_pInputFormatContexts.resize(m_Audios.size());
 	m_pInputCodecContexts.resize(m_Audios.size());
 	for (int i = 0; i < m_Audios.size(); ++i) {
@@ -432,15 +574,17 @@ void AudioMixer::ProcessInputAudios()
 
 							// Push the audio data from decoded frame into the filtergraph./
 						int ret = av_buffersrc_write_frame(m_pBufferFilterContexts[i], audioFrameConverted);
+						if( ret < 0)OUTPUT_LOG("Failed to wirte buffer src frame");
 					}
 				}
 			}
 
-		}
+		}// end while
 
 		av_frame_free(&audioFrameConverted);
 		av_frame_free(&audioFrameDecoded);
 		av_free_packet(&inPacket);
+		avformat_close_input(&m_pInputFormatContexts[i]);
 	}// end for
 
 	{
@@ -452,17 +596,16 @@ void AudioMixer::ProcessInputAudios()
 		audioFrameFiltered->channels = m_pAudioEncoderContext->channels;
 		audioFrameFiltered->sample_rate = m_pAudioEncoderContext->sample_rate;
 		int frameFinished = 0;
+		int numFailedFrame = 0;
+		int numSuccessFrame = 0;
 		while (true) {
 			int ret = av_buffersink_get_frame(m_pBuffersinkFilterContext, audioFrameFiltered);
-			if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-			break;
-		}
-
-
+			if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
 			if (ret < 0) {
-			continue;
-		}
-
+				numFailedFrame++;
+				continue;
+			}
+		
 			AVPacket outPacket;
 			av_init_packet(&outPacket);
 			outPacket.data = NULL;
@@ -472,21 +615,23 @@ void AudioMixer::ProcessInputAudios()
 				OUTPUT_LOG("Error encoding audio frame");
 
 			if (frameFinished) {
-			outPacket.stream_index = m_pAudioStream->index;
+				outPacket.stream_index = m_pAudioStream->index;
 
-			if (av_interleaved_write_frame(m_pOutputFormatContext, &outPacket) != 0)
-				OUTPUT_LOG("Error while writing audio frame");
-
-			av_free_packet(&outPacket);
-		}
-			//av_frame_unref(audioFrameFiltered);
-
+				if (av_interleaved_write_frame(m_pOutputFormatContext, &outPacket) != 0)
+					OUTPUT_LOG("Error while writing audio frame");
+				numSuccessFrame++;
+				av_free_packet(&outPacket);
+			}
+			av_frame_unref(audioFrameFiltered);
 		}// end while
+		OUTPUT_LOG("Failed to get audio frame number, %d!\n", numFailedFrame);
+		OUTPUT_LOG("Success to get audio frame number, %d!\n", numSuccessFrame);
 	}
-
 
 	// Don't forget to close the audio encoder
 	avcodec_close(m_pAudioStream->codec); 
+
+	std::remove(filePath);
 }
 
 int AudioMixer::ReadAndDecodeAudioFrame(AVFrame *frame, AVFormatContext *inputFormatContext,
@@ -584,7 +729,6 @@ void AudioMixer::InitPacket(AVPacket *packet)
 void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 {
 	m_Audios.clear();
-	OUTPUT_LOG("Error: Start  ParseAudioFiles  value \n");
 	std::regex re(",");
 	std::sregex_token_iterator
 		first{ rawdata.begin(), rawdata.end(), re, -1 },
@@ -597,13 +741,11 @@ void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 		unsigned long startTIme = std::stoi(audioFiles[i + 1], std::string::size_type());
 		m_Audios.emplace_back(AudioFile(name, startTIme, 0));
 	}
-	//m_Audios[0].m_strFileName = "D:/Projects/3rdParty/1.mp3";
-	//m_Audios[0].m_strFileName = "D:/Projects/3rdParty/1.ogg";
 }
 
-void AudioMixer::SetCaptureStartFrameNum(unsigned int startTime)
+void AudioMixer::SetCaptureStartTime(unsigned int startTime)
 {
-	m_nCaptureStartFrameNum = startTime;
+	m_nCaptureStartTime = startTime;
 }
 
 void AudioMixer::CleanUp()
