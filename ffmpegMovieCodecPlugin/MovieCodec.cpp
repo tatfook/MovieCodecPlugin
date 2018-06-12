@@ -12,6 +12,7 @@
 #include <vector>
 #include <chrono>
 
+
 extern "C"
 {
 #include <libavutil/opt.h>
@@ -28,11 +29,12 @@ extern "C"
 }
 
 #include "stdafx.h"
+
 #include "AudioCapture.h"
-#include "MovieCodec.h"
 #include "AudioMixer.h"
 #include "FrameRateController.h"
-
+#include "MovieCodec.h"
+#include "AudioRecordAudioFromMicrophone.h"
 /** define this to duplicate lagged frames. */
 // #define DUPLICATE_TAGGED_FRAMES 
 
@@ -41,6 +43,8 @@ extern "C"
 
 /**  whether separate capturing and encoding thread into 2 threads. */
 #define ENABLE_ASYNC_ENCODING   true
+
+AudioRecordAudioFromMicrophone recorder;
 
 using namespace ParaEngine;
 
@@ -509,7 +513,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 	// get current frame number
 	int nCurrentFrameNum = 0;
-	int nLastFrrameNum = nCurrentFrameNum;
+	int nLastFrameNum = nCurrentFrameNum;
 	int nFrameCount = 0;
 	bool firstCaptureFrame = true;
 	int lastTime = 0;
@@ -517,17 +521,16 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 	// NOTE: when 1000 cannot be divided by m_nRecordingFPS with no remainder 
 	// we lose accuracy significantly
-	int period = 1;
 	const int deltaTime = (1000.0 / (double)m_nRecordingFPS);
 	const int remainder = 1000 % m_nRecordingFPS;
-	// least common multiplier of remainder and FPS
-	int remainderFPSlcm = remainder * m_nRecordingFPS / av_gcd(remainder, m_nRecordingFPS);
-	int timeToMakeUp = remainderFPSlcm / m_nRecordingFPS;
-	if(remainder > 0)period = remainderFPSlcm / remainder;
+	int remFPSlcm = remainder * m_nRecordingFPS / av_gcd(remainder, m_nRecordingFPS);
+	int timeToMakeUp = remFPSlcm / m_nRecordingFPS;
+	int period = 1;
+	if(remainder > 0)period = remFPSlcm / remainder;
 	for (UINT32 nPasses = 0; !bDone; nPasses++){
 		bool bFlushStream = (m_nCurrentFrame % 200) == 0;
+
 		if (m_bStopEvent) {
-			OUTPUT_LOG("Received stop event after %d frames\n", m_nCurrentFrame);
 			bDone = true;
 			continue; // exits loop
 		}
@@ -538,10 +541,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			continue; // exits loop
 		}
 
-		DWORD nCurTime = timeGetTime();
-
-		float nFramesToCapture = (float)(((nCurTime - nBeginTime) / 1000.f * m_nRecordingFPS) - m_nCurrentFrame);
-		if (nFramesToCapture > 0.f){
+		{
 			// get "ItemsLeft" to nItemsLeft, "DirtyBlockCount" to nDirtyBlockCount
 			int nItemsLeft = -1, nDirtyBlockCount = -1;
 			pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
@@ -552,10 +552,15 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			lastTime += deltaTime;
 			if (((nPasses + 1) % period) == 0)lastTime += timeToMakeUp;
 			pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
+			if (firstCaptureFrame) {
+				m_AudioMixer->SetCaptureStartTime(lastTime);
+				OUTPUT_LOG("Capture starting time: %d!\n", lastTime);
+				firstCaptureFrame = false;
+			}
 			// wait render engine to finish current frame 
-			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrrameNum)){
+			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrameNum)){
 				// nItemsLeft or nDirtyBlockCount bigger than 0 implies the engine has not finished rendering the current scene yet
-				std::this_thread::sleep_for(std::chrono::milliseconds(25));
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				nItemsLeft = -1, nDirtyBlockCount = -1;
 				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
@@ -566,21 +571,15 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				bDone = true;
 				continue; // exits loop
 			}else{
-				if (nFramesToCapture > 1.f){
-					m_nCurrentFrame += (int)(nFramesToCapture - 1 + 0.5f);
-				}
-				nFrameCount++;
-				if (firstCaptureFrame) {
-					m_AudioMixer->SetCaptureStartFrameNum(nCurrentFrameNum);
-					firstCaptureFrame = false;
-				}
+				nFrameCount++;	
 			}
-			nLastFrrameNum = nCurrentFrameNum;
+			nLastFrameNum = nCurrentFrameNum;
 			std::this_thread::sleep_for(std::chrono::milliseconds(25));
 		}
 	}// end for loop
 
-	OUTPUT_LOG("frame number: %d !\n", nFrameCount);
+	OUTPUT_LOG("Total frames captured: %d !\n", nFrameCount);
+	OUTPUT_LOG("Last frame number: %d !\n", nLastFrameNum);
 
 	// set back previous AsynChunkMode value when we finish capturing video
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, bPreAsyncChunkModeValue);
