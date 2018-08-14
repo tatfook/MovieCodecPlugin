@@ -117,7 +117,7 @@ void ParaEngine::MovieCodec::StaticInit()
 	/* Initialize libavcodec, and register all codecs and formats. */
 	av_register_all();
 	avcodec_register_all();
-	// avfilter_register_all();
+	//avfilter_register_all();
 	// avformat_network_init();
 }
 
@@ -292,15 +292,17 @@ DWORD ParaEngine::MovieCodec::EndCaptureInThread()
 	if (m_audio_st)
 		close_audio(m_pFormatContext, m_audio_st);
 
+	if (m_AudioMixer) {
+		delete m_AudioMixer;
+		m_AudioMixer = nullptr;
+	}
+
 	if (!(m_pOutputFormat->flags & AVFMT_NOFILE)){
 		/* Close the output file. */
 		avio_close(m_pFormatContext->pb);
 	}
 
-	if (m_AudioMixer) {
-		delete m_AudioMixer;
-		m_AudioMixer = nullptr;
-	}
+
 
 
 	/* free the stream */
