@@ -53,32 +53,35 @@ private:
 	void InitAudioStream();
 	void InitFilerGraph(int chanels);
 	void ProcessInputAudios();
-	int ReadAndDecodeAudioFrame(AVFrame* frame, AVFormatContext* inputFormatContext,
-		AVCodecContext* inputCodecContext, int& hasData, bool& finished);
-	int EncodeAndWriteAudioFrame(AVFrame* frame, AVFormatContext* outputFormatContext,
-		AVCodecContext* outputCodecContext);
-	int InitInputFrame(AVFrame **frame);
-	void InitPacket(AVPacket *packet);
 	void CleanUp();
+
+	int SelectSampleRate(const AVCodec *codec);
+	int CheckSampleFmt(const AVCodec *codec, enum AVSampleFormat sample_fmt);
+	int SelectChannelLayout(const AVCodec *codec);
+
+	int OpenAudioInput(const char *filename, AVFormatContext*& fmt_ctx, AVCodecContext*& dec_ctx);
+	void OpenInputs();
+	void CollectInputsInfo();
+	void MixAudios();
 
 private:
 	// about input audios 
 	std::vector<AudioFile> m_Audios;
-	std::vector<AVCodecContext*> m_pInputCodecContexts;
-	std::vector<AVFormatContext*> m_pInputFormatContexts;
-	AVFormatContext* m_pOutputFormatContext;
-	AVOutputFormat* m_pOutputFormat;
+	std::vector<AVCodecContext*> m_InputCodecCtxs;
+	std::vector<AVFormatContext*> m_InputFmtCtxs;
+	AVFormatContext* m_pOutputFmtCtx;
+	AVOutputFormat* m_pOutputFmt;
 	SwrContext* m_pSWRctx;
-	AVStream* m_pAudioStream;
-	AVCodecContext* m_pAudioEncoderContext;
-	AVCodec* m_pAudioCoder;
+	AVStream* m_OutputAudioSt;
+	AVCodecContext* m_OutputAudioCodecCtx;
+	AVCodec* m_OutputAudioCodec;
 
 	// filters
-	std::vector<AVFilterContext*> m_pBufferFilterContexts;
-	std::vector<AVFilterContext*> m_pDelayFilterContexts;
-	AVFilterContext* m_pBuffersinkFilterContext;
-	AVFilterContext* m_pMixFilterContext;
-	AVFilterGraph* m_pFilterGraph;
+	std::vector<AVFilterContext*> m_BufferSrcCtx;
+	std::vector<AVFilterContext*> m_DelayCtx;
+	AVFilterContext* m_BuffersinkCtx;
+	AVFilterContext* m_MixCtx;
+	AVFilterGraph* m_FilterGraph;
 
 	// record the frame number when capture starts 
 	unsigned long m_nCaptureStartTime;
