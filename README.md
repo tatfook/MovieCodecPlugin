@@ -7,15 +7,13 @@ Date: 2014.5
 Add environment variable `NPLRUNTIME_ROOT` that point to git root of NPLRuntime.
 
 Open this folder with visual studio 2017 or above and build the cmake file.
-The output is in folder `Mod/MovieCodecPlugin/MovieCodecPlugin.dll` along with some prebuild dll files
+The output is `Mod/MovieCodecPlugin/MovieCodecPlugin.dll`, which has no external dependencies.
 
-One can also run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft mod installer file.
+Run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft mod installer file.
+This file can be copied to `Mod/MovieCodecPlugin.zip` to install it manually to paracraft.
 
-### How to Install
-Open paracraft's mod site and install MovieCodecPlugin
-
-### How to Install Manually?
-Open paracraft and copy `Mod/MovieCodecPlugin/*.dll` to `[paracraft]/Mod/MovieCodecPlugin/`
+### How to Install On Win32
+Open paracraft's mod site and install MovieCodecPlugin, make sure it is enabled by default.
 
 ### How to Run
 Press F9 or use `/recoder` command to launch the movie codec.
@@ -24,12 +22,7 @@ Press F9 or use `/recoder` command to launch the movie codec.
 
 ## 安装指南
 - 使用Paracraft下载MOD
-- 打开MOD文件夹，将下载的ZIP文件解压到所在文件夹, 解压缩后的文件目录，如下图 `mod/MovieCodecPlugin/*.dll`.
-- 禁用这个插件(并删除zip文件)完成安装
-
-![image](https://user-images.githubusercontent.com/94537/32473892-bc4d807e-c3a4-11e7-9a31-ef5b3f3ebcf8.png)
-
 - 在Paracraft中按F9或输入`/recorder`命令启动插件。
 
 ## 常见问题
--  请确保电脑使用的是立体声输出，否则会crash.
+- 请确保电脑使用的是立体声输出，否则会crash.
