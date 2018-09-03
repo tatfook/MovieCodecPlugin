@@ -8,6 +8,7 @@ mkdir release\Mod\MovieCodecPlugin
 
 
 xcopy Mod\MovieCodecPlugin\*.dll release\Mod\MovieCodecPlugin
+xcopy Mod\MovieCodecPlugin\*.lua release\Mod\MovieCodecPlugin
 if exist release\Mod\MovieCodecPlugin\MovieCodecPlugin_d.dll ( del /f release\Mod\MovieCodecPlugin\MovieCodecPlugin_d.dll )
 
 pushd release

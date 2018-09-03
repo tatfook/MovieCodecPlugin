@@ -20,8 +20,11 @@ function MovieCodecPlugin:GetName()
 	return "MovieCodecPlugin"
 end
 
--- virtual function get mod description 
+function MovieCodecPlugin:GetVersion()
+	return 4;
+end
 
+-- virtual function get mod description 
 function MovieCodecPlugin:GetDesc()
 	return "MovieCodecPlugin is a plugin in paracraft"
 end
