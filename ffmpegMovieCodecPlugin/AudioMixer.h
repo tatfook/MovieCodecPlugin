@@ -49,9 +49,8 @@ public:
 	void SetCaptureStartTime(unsigned int );
 
 private:
-	void InitResampleSettings(AVFormatContext* pInputFormatContext);
 	void InitAudioStream();
-	void InitFilerGraph(int chanels);
+	void CreateFilterGraph(int chanels);
 	void ProcessInputAudios();
 	void CleanUp();
 
@@ -71,7 +70,6 @@ private:
 	std::vector<AVFormatContext*> m_InputFmtCtxs;
 	AVFormatContext* m_pOutputFmtCtx;
 	AVOutputFormat* m_pOutputFmt;
-	SwrContext* m_pSWRctx;
 	AVStream* m_OutputAudioSt;
 	AVCodecContext* m_OutputAudioCodecCtx;
 	AVCodec* m_OutputAudioCodec;
