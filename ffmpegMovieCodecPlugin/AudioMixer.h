@@ -18,18 +18,22 @@ namespace ParaEngine {
 	class MovieCodec;
 }
 
-struct AudioFile
+struct AudioRecord
 {
-	AudioFile(std::string file, unsigned int s, unsigned int e)
-		:m_strFileName(file)
-		, m_nStartFrameNum(s)
-		, m_nEndFrameNum(e)
+	AudioRecord(std::string file, int s, int e, int seek = 0, bool isLoop = false)
+		: m_strFileName(file)
+		, m_nStartTime(s)
+		, m_nEndTime(e)
+		, m_nSeekPos(isLoop)
+		, m_bIsLoop()
 	{}
 	std::string m_strFileName;
-	unsigned int m_nStartFrameNum;
-	unsigned int m_nEndFrameNum;
+	int m_nStartTime;
+	int m_nEndTime;
+	int m_nSeekPos; // the seek positon where it starts when the audio engines play the audio file with name m_WaveFileName
+	bool m_bIsLoop;
 };
-typedef std::vector<AudioFile> AudioFiles;
+typedef std::vector<AudioRecord> AudioFiles;
 
 /** 
 This class merges multi audio streams (.wav, .au etc.) inputs into a single one with proper delay(s).
@@ -47,10 +51,11 @@ public:
 	bool Mix();
 
 	void SetCaptureStartTime(unsigned int );
+	void SetCaptureEndTime(unsigned int);
 
 private:
 	void InitAudioStream();
-	void CreateFilterGraph(int chanels);
+	void CreateMixFilterGraph(std::vector<AudioRecord>& inputs);
 	void ProcessInputAudios();
 	void CleanUp();
 
@@ -59,13 +64,17 @@ private:
 	int SelectChannelLayout(const AVCodec *codec);
 
 	int OpenAudioInput(const char *filename, AVFormatContext*& fmt_ctx, AVCodecContext*& dec_ctx);
-	void OpenInputs();
+	void OpenInputs(const std::vector<AudioRecord>& inputs);
 	void CollectInputsInfo();
-	void MixAudios();
+	void MixAudios(AudioRecord& merged);
+	void DelayAllInputs(std::vector<AudioRecord>& delayedAudios);
+	std::string ClipAudio(AudioRecord);
+
+	void MergeInputs(const std::vector<AudioRecord>& todo, AudioRecord& result);
 
 private:
 	// about input audios 
-	std::vector<AudioFile> m_Audios;
+	std::vector<AudioRecord> m_Audios;
 	std::vector<AVCodecContext*> m_InputCodecCtxs;
 	std::vector<AVFormatContext*> m_InputFmtCtxs;
 	AVFormatContext* m_pOutputFmtCtx;
@@ -76,13 +85,12 @@ private:
 
 	// filters
 	std::vector<AVFilterContext*> m_BufferSrcCtx;
-	std::vector<AVFilterContext*> m_DelayCtx;
 	AVFilterContext* m_BuffersinkCtx;
-	AVFilterContext* m_MixCtx;
 	AVFilterGraph* m_FilterGraph;
 
 	// record the frame number when capture starts 
-	unsigned long m_nCaptureStartTime;
+	unsigned int m_nCaptureStartTime;
+	unsigned int m_nCaptureEndTime;
 
 	uint8_t* m_pConvertedDataBuffer;
 
