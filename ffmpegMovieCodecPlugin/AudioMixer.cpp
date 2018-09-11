@@ -37,6 +37,7 @@ extern "C"
 #include<locale>
 #include<codecvt>
 #include<filesystem>
+#include<fstream>
 
 using namespace ParaEngine;
 
@@ -145,8 +146,6 @@ void AudioMixer::CreateMixFilterGraph(std::vector<AudioRecord>& inputAudios)
 		return;
 	}
 
-
-
 	char filter_descr[512];
 	if (chanels == 1) {
 		snprintf(filter_descr, sizeof(filter_descr), "volume=2.0,amix=inputs=%d:duration=longest:dropout_transition=2", chanels);
@@ -222,9 +221,6 @@ void AudioMixer::CreateMixFilterGraph(std::vector<AudioRecord>& inputAudios)
 
 	// Configure the graph. 
 	ret = avfilter_graph_config(m_FilterGraph, NULL);
-	char* graph = avfilter_graph_dump(m_FilterGraph, nullptr);
-	av_log( nullptr, 0, graph);
-	OUTPUT_LOG(graph);
 	if (ret < 0) {
 		OUTPUT_LOG("Error while configuring graph!\n"); 
 		return;// note: mem leak
@@ -241,7 +237,7 @@ void AudioMixer::DelayAllInputs(std::vector<AudioRecord>& delayedAudios)
 	inputCodecCtxs.resize(m_Audios.size());
 	for (int i = 0; i < m_Audios.size(); ++i) {
 		if (m_Audios[i].m_nStartTime < m_nCaptureStartTime)continue;// skip the audio playing before capture
-		this->OpenAudioInput(m_Audios[i].m_strFileName.c_str(), inputFmtCtxs[i], inputCodecCtxs[i]);
+		this->OpenAudioInput(m_Audios[i].m_FileName.c_str(), inputFmtCtxs[i], inputCodecCtxs[i]);
 		if (!inputFmtCtxs[i])continue;
 
 #pragma region CREATE FILTER GRAPH
@@ -340,7 +336,7 @@ void AudioMixer::DelayAllInputs(std::vector<AudioRecord>& delayedAudios)
 		// set output file name
 		char filePath[512];
 		char suffix[32];
-		snprintf(filePath, sizeof(filePath), "%s", m_Audios[i].m_strFileName.c_str());
+		snprintf(filePath, sizeof(filePath), "%s", m_Audios[i].m_FileName.c_str());
 		snprintf(suffix, sizeof(suffix), "_delayed_%d.mp3", i);
 		for (int i = 0; i < 512; ++i) {
 			if (filePath[i] == '.') {
@@ -512,7 +508,7 @@ void AudioMixer::MergeInputs(const std::vector<AudioRecord>& todo, AudioRecord& 
 	inputFmtCtxs.resize(todo.size());
 	inputCodecCtxs.resize(todo.size());
 	for (int i = 0; i < todo.size(); ++i) {
-		this->OpenAudioInput(todo[i].m_strFileName.c_str(), inputFmtCtxs[i], inputCodecCtxs[i]);
+		this->OpenAudioInput(todo[i].m_FileName.c_str(), inputFmtCtxs[i], inputCodecCtxs[i]);
 	}
 #pragma endregion
 
@@ -605,7 +601,7 @@ void AudioMixer::MergeInputs(const std::vector<AudioRecord>& todo, AudioRecord& 
 	// set output file name
 	char filePath[512];
 	char suffix[32];
-	std::sprintf(filePath, "%s", todo[0].m_strFileName.c_str());
+	std::sprintf(filePath, "%s", todo[0].m_FileName.c_str());
 	std::sprintf(suffix,  "_merged_.mp3");
 	for (int i = 0; i < 512; ++i) {
 		if (filePath[i] == '.') {
@@ -791,7 +787,7 @@ void AudioMixer::MergeInputs(const std::vector<AudioRecord>& todo, AudioRecord& 
 		avformat_close_input(&inputFmtCtxs[i]);
 	}
 	
-	result.m_strFileName = filePath;
+	result.m_FileName = filePath;
 	result.m_nStartTime = m_nCaptureStartTime;
 }
 
@@ -800,23 +796,57 @@ void AudioMixer::ProcessInputAudios()
 	this->CollectInputsInfo();
 	if (m_Audios.empty()) return;
 
-	std::sort(m_Audios.begin(), m_Audios.end(), [](const AudioRecord& a1, const AudioRecord& a2) {
-		return a1.m_nStartTime < a2.m_nStartTime; });
+	// temporary files that must be removed after this process
+	std::vector<AudioRecord> tempRecords;
 
+	// insert loop audios
+	std::vector<AudioRecord> loopRecords;
 	for (int i = 0; i < m_Audios.size(); ++i) {
-		if (m_Audios[i].m_nEndTime < 0 || m_Audios[i].m_nSeekPos > 0) {
-			// clip
-			m_Audios[i].m_strFileName = this->ClipAudio(m_Audios[i]);
+		if (m_Audios[i].m_bIsLoop) {
+			if (m_Audios[i].m_nEndTime < 0) {
+				m_Audios[i].m_nEndTime = m_nCaptureEndTime;
+			}
+
+			float dur = (m_Audios[i].m_nEndTime - m_Audios[i].m_nStartTime) / 1000.0 / m_Audios[i].m_Duration;
+			int numLoop = (int)dur;
+			int duration = m_Audios[i].m_Duration * 1000;// in milliseconds
+			for (int j = 0; j < numLoop; ++j) {
+				int start = m_Audios[i].m_nEndTime + j * duration;
+				int end = -1;
+				AudioRecord loopRecord(m_Audios[i].m_FileName, start, end);
+				loopRecords.emplace_back(loopRecord);
+			}
+
+			m_Audios[i].m_nStartTime + numLoop * duration;
+			m_Audios[i].m_nEndTime = (dur - numLoop)*duration;
 		}
 	}
+	m_Audios.insert(m_Audios.end(),loopRecords.begin(), loopRecords.end());
+
+	// clip video if they were stopped during playing
+	for (int i = 0; i < m_Audios.size(); ++i) {
+		if (m_Audios[i].m_nEndTime > 0 || m_Audios[i].m_nSeekPos > 0) {
+			std::string fileName = this->ClipAudio(m_Audios[i]);
+			if (fileName != m_Audios[i].m_FileName) {
+				m_Audios[i].m_FileName = fileName;
+				// new clipped audio file generated, must be removed at the end 
+				tempRecords.emplace_back(m_Audios[i]);
+			}
+			 		
+		}
+	}
+
+	std::sort(m_Audios.begin(), m_Audios.end(), [](const AudioRecord& a1, const AudioRecord& a2) {
+		return a1.m_nStartTime < a2.m_nStartTime; });
 
 	std::vector<AudioRecord> delayedAudios;
 	this->DelayAllInputs(delayedAudios);
 
-
 	std::list<AudioRecord> todos;
 	for (int i = 0; i < delayedAudios.size(); ++i) {
 		todos.push_back(delayedAudios[i]);
+		// all delayed files are temporary must be removed at the end
+		tempRecords.emplace_back(delayedAudios[i]);
 	}
 
 	std::vector<AudioRecord> mergedAudios;
@@ -827,7 +857,7 @@ void AudioMixer::ProcessInputAudios()
 
 		char filePath[512];
 		char suffix[32];
-		std::sprintf(filePath, "%s", audios.front().m_strFileName.c_str());
+		std::sprintf(filePath, "%s", audios.front().m_FileName.c_str());
 		std::sprintf(suffix, "_merged_.mp3");
 		for (int i = 0; i < 512; ++i) {
 			if (filePath[i] == '.') {
@@ -846,6 +876,8 @@ void AudioMixer::ProcessInputAudios()
 		//this->MergeInputs(audios, merged);
 		todos.push_back(merged);
 		mergedAudios.push_back(merged);
+		// all merged files are temporary must be removed at the end
+		tempRecords.emplace_back(merged);
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
 
@@ -858,13 +890,10 @@ void AudioMixer::ProcessInputAudios()
 	this->MixAudios(emptyFile);
 	this->CleanUp();
 
-	// remove the temporary file
-	for (int i = 0; i < delayedAudios.size(); ++i) {
-		std::remove(delayedAudios[i].m_strFileName.c_str());
-	}
-	for (int i = 0; i < mergedAudios.size(); ++i) {
-		std::remove(mergedAudios[i].m_strFileName.c_str());
-	}
+	//// remove the temporary file
+	//for (int i = 0; i < tempRecords.size(); ++i) {
+	//	std::remove(tempRecords[i].m_FileName.c_str());
+	//}
 }
 
 void AudioMixer::ParseAudioFiles(const std::string& rawdata)
@@ -877,10 +906,10 @@ void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 	for (int i = 0; i < audioFiles.size()-1; i+=5 ) {
 		std::string name = audioFiles[i];
 		int start, end, seek, isloop;
-		std::sscanf(audioFiles[i + 1].c_str(), "%d", start);
-		std::sscanf(audioFiles[i + 2].c_str(), "%d", end);
-		std::sscanf(audioFiles[i + 3].c_str(), "%d", seek);
-		std::sscanf(audioFiles[i + 4].c_str(), "%d", isloop);
+		std::sscanf(audioFiles[i + 1].c_str(), "%d", &start);
+		std::sscanf(audioFiles[i + 2].c_str(), "%d", &end);
+		std::sscanf(audioFiles[i + 3].c_str(), "%d", &seek);
+		std::sscanf(audioFiles[i + 4].c_str(), "%d", &isloop);
 		m_Audios.emplace_back(AudioRecord(name, start, end, seek, isloop));
 	}
 }
@@ -973,22 +1002,22 @@ void AudioMixer::MixAudios(AudioRecord& merged)
 	int numReceived = 0;
 	int numAddToGraphFrame = 0;
 
-	bool muxWithVideo = merged.m_strFileName.empty();
+	bool muxWithVideo = merged.m_FileName.empty();
 	AVFormatContext* outputFormat = nullptr;
 	AVCodecContext* outputCodec = nullptr;
 	if (!muxWithVideo) {
 		AVIOContext* ioContext = NULL;
-		int ret = avio_open(&ioContext, merged.m_strFileName.c_str(), AVIO_FLAG_WRITE);
+		int ret = avio_open(&ioContext, merged.m_FileName.c_str(), AVIO_FLAG_WRITE);
 		if (ret < 0) {
-			OUTPUT_LOG("Failed to open %s: %d\n", merged.m_strFileName.c_str());
+			OUTPUT_LOG("Failed to open %s: %d\n", merged.m_FileName.c_str());
 			return;
 		}
 
 		outputFormat = avformat_alloc_context();
 		outputFormat->pb = ioContext;
-		outputFormat->oformat = av_guess_format(NULL, merged.m_strFileName.c_str(), NULL);
+		outputFormat->oformat = av_guess_format(NULL, merged.m_FileName.c_str(), NULL);
 
-		av_strlcpy(outputFormat->filename, merged.m_strFileName.c_str(), sizeof((outputFormat)->filename));
+		av_strlcpy(outputFormat->filename, merged.m_FileName.c_str(), sizeof((outputFormat)->filename));
 
 		AVCodec* codec = avcodec_find_encoder(outputFormat->oformat->audio_codec);
 
@@ -1018,7 +1047,7 @@ void AudioMixer::MixAudios(AudioRecord& merged)
 		/** Open the encoder for the audio stream to use it later. */
 		ret = avcodec_open2(outputCodec, codec, nullptr);
 		if (ret < 0) {
-			OUTPUT_LOG("Failed to open the encoder for the audio stream %s .\n", merged.m_strFileName.c_str());
+			OUTPUT_LOG("Failed to open the encoder for the audio stream %s .\n", merged.m_FileName.c_str());
 			return;
 		}
 
@@ -1208,12 +1237,12 @@ void AudioMixer::CollectInputsInfo()
 		AVFormatContext* pInputFormatContext = nullptr;
 		// Open the input file to read from it.
 
-		int ret = avformat_open_input(&pInputFormatContext, m_Audios[i].m_strFileName.c_str(), NULL, NULL);
+		int ret = avformat_open_input(&pInputFormatContext, m_Audios[i].m_FileName.c_str(), NULL, NULL);
 		if (ret < 0) {
-			OUTPUT_LOG("Could not open input file %s \n", m_Audios[i].m_strFileName.c_str());
+			OUTPUT_LOG("Could not open input file %s \n", m_Audios[i].m_FileName.c_str());
 			continue;// NOTE: what if if it failed?
 		}
-		OUTPUT_LOG("Open input file %s, startFrame: %d  \n", m_Audios[i].m_strFileName.c_str(), m_Audios[i].m_nStartTime);
+		OUTPUT_LOG("Open input file %s, startFrame: %d  \n", m_Audios[i].m_FileName.c_str(), m_Audios[i].m_nStartTime);
 
 		// Get information on the input file (number of streams etc.).
 		if (avformat_find_stream_info(pInputFormatContext, NULL) < 0) {
@@ -1236,6 +1265,14 @@ void AudioMixer::CollectInputsInfo()
 			avformat_close_input(&pInputFormatContext);
 			continue;// NOTE: what if if it failed?
 		}
+
+		// quick method
+		long long duration = 0;
+		AVStream* stream = pInputFormatContext->streams[0];
+		m_Audios[i].m_Duration = (float)(stream->duration * stream->time_base.num) / (float)stream->time_base.den;
+
+
+
 		// Don't forget to close the audio encoder
 		avcodec_close(pInputFormatContext->streams[0]->codec);
 		avformat_close_input(&pInputFormatContext);
@@ -1252,19 +1289,277 @@ void AudioMixer::OpenInputs(const std::vector<AudioRecord>& inputs)
 	m_InputFmtCtxs.resize(inputs.size());
 	m_InputCodecCtxs.resize(inputs.size());
 	for (int i = 0; i < inputs.size(); ++i) {
-		this->OpenAudioInput(inputs[i].m_strFileName.c_str(), m_InputFmtCtxs[i], m_InputCodecCtxs[i]);
+		this->OpenAudioInput(inputs[i].m_FileName.c_str(), m_InputFmtCtxs[i], m_InputCodecCtxs[i]);
 	}// end for
 }
 
 std::string AudioMixer::ClipAudio(AudioRecord audio)
 {
+	AVCodecContext* inputCodecCtx = nullptr;
+	AVFormatContext* inputFmtCtx = nullptr;
+	std::string trimmedFile = audio.m_FileName;
+	this->OpenAudioInput(audio.m_FileName.c_str(), inputFmtCtx, inputCodecCtx);
+	if (inputFmtCtx == nullptr || audio.m_nStartTime < m_nCaptureStartTime)goto end;
+
+#pragma region CREATE FILTER GRAPH
+	// create atrim filter graph 
+	AVFilterGraph* graph = avfilter_graph_alloc();
+	if (graph == nullptr) {
+		OUTPUT_LOG("Failed to create the atrim filter graph!\n");
+		goto end;
+	}
+
+	// set atrim descriptor 
 	float start = -1.0;
 	float end = -1.0;
-	if (audio.m_nSeekPos > 0) start = audio.m_nSeekPos;
-	if (audio.m_nEndTime > 0) end = (audio.m_nEndTime - m_nCaptureStartTime) / 1000.0;
+	start =  (audio.m_nSeekPos > 0 ? audio.m_nSeekPos : 0.0);
+	if (audio.m_nEndTime > 0) end = (audio.m_nEndTime - audio.m_nStartTime) / 1000.0;
+	
+	char descrpt[512];
+	// at least one of start and end is bigger than zero
+	if (start > 0 && end > 0) {
+		std::sprintf(descrpt, "atrim=start=%f:end=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu",start, end,
+			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
+	}else if (start > 0) {
+		std::sprintf(descrpt, "atrim=start=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu", start,
+			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
+	}else {
+		std::sprintf(descrpt, "atrim=end=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu", end,
+			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
+	}
 
-	// create filter graph
+	AVFilterInOut* inputs = nullptr;
+	AVFilterInOut* outputs = nullptr;
+	int ret = avfilter_graph_parse2(graph, descrpt, &inputs, &outputs);
+	if (ret < 0) {
+		OUTPUT_LOG(descrpt);
+		OUTPUT_LOG("Failed to parse filter description: %s!", descrpt);
+		goto end;
+	}
 
+	// Create the abuffer filter to buffer audio frames, and make them available to the filter chain.
+	const AVFilter* buffer = avfilter_get_by_name("abuffer");
+	if (buffer == nullptr) {
+		OUTPUT_LOG("Could not find the abuffer filter!\n");
+		goto end;
+	}
+	char name[16], args[512];
+	snprintf(name, sizeof(name), "buffer");
+	snprintf(args, sizeof(args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%llu",
+		inputCodecCtx->time_base.num,
+		inputCodecCtx->time_base.den,
+		inputCodecCtx->sample_rate,
+		av_get_sample_fmt_name(inputCodecCtx->sample_fmt),
+		inputCodecCtx->channel_layout);
+	AVFilterContext* abufferCtx = nullptr;
+	ret = avfilter_graph_create_filter(&abufferCtx, buffer, name, args, nullptr, graph);
+	if (ret < 0) {
+		OUTPUT_LOG("Could not create the abuffer filter context!\n");
+		goto end;
+	}
+	// link to the trim filter
+	ret = avfilter_link(abufferCtx, 0, inputs->filter_ctx, inputs->pad_idx);
+	if (ret < 0) {
+		OUTPUT_LOG("Could not link the abuffer filter to adelay filter!\n");
+		goto end;
+	}
 
+	// Finally create the abuffersink filter to buffer audio frames, and make them available to the end of filter chain.
+	const AVFilter* sinkbuffer = avfilter_get_by_name("abuffersink");
+	if (!sinkbuffer) {
+		OUTPUT_LOG("Could not find the abuffersink filter!\n");
+		goto end;
+	}
+	AVFilterContext* sinkbufferCtx = avfilter_graph_alloc_filter(graph, sinkbuffer, "sink");
+	if (!sinkbuffer) {
+		OUTPUT_LOG("Could not find the abuffersink filter!\n");
+		goto end;
+	}
+	ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, sinkbufferCtx, 0);
+	if (ret < 0) {
+		OUTPUT_LOG("Could not link the abuffer filter to adelay filter!\n");
+		goto end;
+	}
+	if (inputCodecCtx->frame_size > 0)
+		av_buffersink_set_frame_size(sinkbufferCtx, inputCodecCtx->frame_size);
+
+	// Configure the delay filter  graph. 
+	ret = avfilter_graph_config(graph, NULL);
+	if (ret < 0) {
+		OUTPUT_LOG("Error while configuring delay filter graph!\n");
+		goto end;
+	}
+#pragma endregion
+
+#pragma region SETUP OUTPUT
+
+	// set output file name
+	size_t pos = trimmedFile.find_last_of(".");
+	trimmedFile.resize(pos+1);
+	trimmedFile += "mp3";
+	trimmedFile.insert(pos, "_trimmed_");
+
+	struct FileExist
+	{
+		bool operator()(const std::string& fileName)
+		{
+			std::ifstream ifile(fileName);
+			return (bool)ifile;
+		}
+	};
+	FileExist fileExist;
+
+	while (fileExist(trimmedFile)) {
+		size_t pos = trimmedFile.find_last_of(".");
+		trimmedFile.insert(pos, "_trimmed_");
+	}
+
+	AVIOContext* ioContext = NULL;
+	ret = avio_open(&ioContext, trimmedFile.c_str(), AVIO_FLAG_WRITE);
+	if (ret < 0) {
+		OUTPUT_LOG("Failed to open %s !\n", trimmedFile.c_str());
+		goto end;
+	}
+
+	AVFormatContext* outputFormat = avformat_alloc_context();
+	outputFormat->pb = ioContext;
+	outputFormat->oformat = av_guess_format(nullptr, trimmedFile.c_str(), nullptr);
+	av_strlcpy(outputFormat->filename, trimmedFile.c_str(), sizeof((outputFormat)->filename));
+	AVCodec* codec = avcodec_find_encoder(outputFormat->oformat->audio_codec);
+	AVStream* stream = avformat_new_stream(outputFormat, codec);
+
+	AVCodecContext* outputCodecCtx = stream->codec; 
+	outputCodecCtx->channels = m_OutputAudioCodecCtx->channels; 
+	outputCodecCtx->channel_layout = m_OutputAudioCodecCtx->channel_layout;
+	outputCodecCtx->sample_rate = m_OutputAudioCodecCtx->sample_rate;
+	outputCodecCtx->sample_fmt = m_OutputAudioCodecCtx->sample_fmt;
+	outputCodecCtx->bit_rate = m_OutputAudioCodecCtx->bit_rate;
+
+	/** Allow the use of the experimental AAC encoder */
+	outputCodecCtx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+
+	/** Set the sample rate for the container. */
+	stream->time_base.den = outputCodecCtx->sample_rate;
+	stream->time_base.num = 1;
+
+	/**
+	* Some container formats (like MP4) require global headers to be present
+	* Mark the encoder so that it behaves accordingly.
+	*/
+	if (outputFormat->oformat->flags & AVFMT_GLOBALHEADER)
+		outputCodecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+	/** Open the encoder for the audio stream to use it later. */
+	ret = avcodec_open2(outputCodecCtx, codec, nullptr);
+	if (ret < 0) {
+		OUTPUT_LOG("Failed to open the encoder for the audio stream %s !\n", trimmedFile.c_str());
+		goto end;
+	}
+
+	// write output file header
+	ret = avformat_write_header(outputFormat, nullptr);
+	if (ret < 0) {
+		OUTPUT_LOG("Failed to write header!\n");
+		goto end;
+	}
+#pragma endregion
+
+#pragma region FILTER THE FRAMES
+	/* pull filtered audio from the filtergraph */
+	AVFrame* inputFrame = av_frame_alloc();
+	AVFrame* filteredFrame = av_frame_alloc();
+	AVPacket outPkt, inPkt;
+	av_init_packet(&outPkt);
+	av_init_packet(&inPkt);
+	int64_t framePts = 0;
+
+	while (true) {
+		// encode filterd frames
+		int err = -1;
+		do {
+			err = av_buffersink_get_frame(sinkbufferCtx, filteredFrame);
+			if (err >= 0) {
+				filteredFrame->pts = framePts;
+				framePts += filteredFrame->nb_samples;
+				avcodec_send_frame(outputCodecCtx, filteredFrame);
+				if (avcodec_receive_packet(outputCodecCtx, &outPkt) == 0) {
+					if (av_interleaved_write_frame(outputFormat, &outPkt) != 0)OUTPUT_LOG("Error while writing audio frame");
+					av_packet_unref(&outPkt);
+				}
+			}
+			av_frame_unref(filteredFrame);
+		} while (err >= 0);
+
+		// need more input
+		if (AVERROR(EAGAIN) == err) {
+			if (av_buffersrc_get_nb_failed_requests(abufferCtx) > 0) {
+				// decode frames and fill into input filter
+				bool finished = false;
+				for (int j = 0; j < 128 && !finished; ++j) {
+					int rEror = -1;
+					while ((rEror = av_read_frame(inputFmtCtx, &inPkt)) >= 0) {
+						if (inPkt.stream_index == 0) {// for later opt
+							int ret = avcodec_send_packet(inputCodecCtx, &inPkt);
+							if (ret < 0) {
+								OUTPUT_LOG("Error while sending a packet to the decoder!\n");
+								break;
+							}
+							while (ret >= 0) {
+								ret = avcodec_receive_frame(inputCodecCtx, inputFrame);
+								if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+									break;
+								}
+								else if (ret < 0) {
+									OUTPUT_LOG("Error while receiving a frame from the decoder!\n");
+									break;// go to end
+								}
+								else {
+									/* push the audio data from decoded frame into the filtergraph */
+									if (av_buffersrc_add_frame_flags(abufferCtx, inputFrame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
+										OUTPUT_LOG("Error while feeding the audio filtergraph!\n");
+									}
+									av_frame_unref(inputFrame);
+								}
+							}// while
+							av_packet_unref(&inPkt);
+						}
+					}// end while
+					if (rEror == AVERROR_EOF) finished = true;
+				}
+				// end input
+				if (finished) av_buffersrc_add_frame(abufferCtx, nullptr);
+			}
+		}
+
+		// flush encoder
+		if ((AVERROR(ENOMEM) == err) || AVERROR_EOF == err) {
+			err = avcodec_send_frame(outputCodecCtx, nullptr);
+			break;
+		}
+
+	}// end while
+
+	av_free_packet(&inPkt);
+	av_free_packet(&outPkt);
+	av_frame_free(&filteredFrame);
+	av_frame_free(&inputFrame);
+#pragma endregion
+
+	// write trailer
+	ret = av_write_trailer(outputFormat);
+	if (ret < 0) {
+		OUTPUT_LOG("Failed to write trailer!\n");
+	}
+	avio_close(outputFormat->pb);
+	avcodec_close(inputFmtCtx->streams[0]->codec);
+
+	avfilter_free(abufferCtx);
+	avfilter_free(sinkbufferCtx);
+	avformat_close_input(&inputFmtCtx);
+
+	avfilter_graph_free(&graph);
+
+	end:
+	   return trimmedFile;
 }
 
