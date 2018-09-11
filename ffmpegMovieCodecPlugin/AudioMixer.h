@@ -20,17 +20,19 @@ namespace ParaEngine {
 
 struct AudioRecord
 {
-	AudioRecord(std::string file, int s, int e, int seek = 0, bool isLoop = false)
-		: m_strFileName(file)
+	AudioRecord(std::string file, int s, int e = -1, int seek = 0, bool isLoop = false)
+		: m_FileName(file)
 		, m_nStartTime(s)
 		, m_nEndTime(e)
 		, m_nSeekPos(isLoop)
 		, m_bIsLoop()
+		, m_Duration(-1.0)
 	{}
-	std::string m_strFileName;
+	std::string m_FileName;
 	int m_nStartTime;
 	int m_nEndTime;
 	int m_nSeekPos; // the seek positon where it starts when the audio engines play the audio file with name m_WaveFileName
+	float m_Duration;
 	bool m_bIsLoop;
 };
 typedef std::vector<AudioRecord> AudioFiles;
