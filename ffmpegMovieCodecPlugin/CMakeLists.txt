@@ -51,7 +51,6 @@ include_directories("${ParaEngineClient_SOURCE_DIR}/util")
 include_directories("${ffmpeg_INCLUDE_DIR}")
 
 IF(MSVC)
-	
 	# statically link MSVC to reduce dependancies
 	foreach(flag_var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
 	 	if(${flag_var} MATCHES "/MD")
@@ -96,14 +95,25 @@ link_libraries(MovieCodecPlugin
 	Avrt
 )
 
+
 # add the executable
 add_library(MovieCodecPlugin SHARED ${MovieCodecPlugin_SRCS})
+
+
+
 
 IF(WIN32)
 	ADD_DEFINITIONS(-DWNT)
 ENDIF(WIN32)
 
 if(MSVC)
+	# disable SAFESEH - to avoid "LNK2026: module unsafe" on "ffmpeg lib"
+    SET(CMAKE_CXX_FLAGS           "${CMAKE_CXX_FLAGS} /D \"SAFESEH:NO\"")
+    SET(CMAKE_EXE_LINKER_FLAGS    "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
+    SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
+    SET(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+
+
 	get_target_property(DEBUG_EXE_PATH MovieCodecPlugin DEBUG_LOCATION)
 	STRING(REGEX REPLACE "^.*[/\\]([^/\\]+)$" "\\1" DEBUG_EXE_NAME "${DEBUG_EXE_PATH}" )
 
