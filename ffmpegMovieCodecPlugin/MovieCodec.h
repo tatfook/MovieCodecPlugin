@@ -183,6 +183,7 @@ namespace ParaEngine
 		std::thread m_capture_thread;
 		std::thread m_encoding_thread;
 		std::mutex m_mutex;
+
 		// this is actually not quite useful now, as both video/audio encoding are done in a single encoding thread. 
 		std::recursive_mutex m_mutex_io_writer;
 		std::condition_variable m_encoding_task_signal;
@@ -203,12 +204,12 @@ namespace ParaEngine
 
 		/* audio related params*/
 		uint8 ** m_src_samples_data;
-		int       m_src_samples_linesize;
-		int       m_src_nb_samples;
-		int		m_max_dst_nb_samples;
-		uint8 **m_dst_samples_data;
-		int       m_dst_samples_linesize;
-		int       m_dst_samples_size;
+		int m_src_samples_linesize;
+		int m_src_nb_samples;
+		int m_max_dst_nb_samples;
+		uint8** m_dst_samples_data;
+		int m_dst_samples_linesize;
+		int m_dst_samples_size;
 		int m_samples_count;
 		int m_nLastLeftDataCount;
 		int m_nLastLostVideoFrame;

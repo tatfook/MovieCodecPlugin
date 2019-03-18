@@ -21,7 +21,7 @@ function MovieCodecPlugin:GetName()
 end
 
 function MovieCodecPlugin:GetVersion()
-	return 4;
+	return 5;
 end
 
 -- virtual function get mod description 

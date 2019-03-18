@@ -116,14 +116,6 @@ if(MSVC)
 		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/" )
 	endif()
 
-	ADD_CUSTOM_COMMAND(
-	   TARGET MovieCodecPlugin
-	   POST_BUILD
-	   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:MovieCodecPlugin> ${OUTPUT_BIN_DIR}
-	)
-
-	include(AddCompileLinkFlags.cmake) 
-	my_add_link_flags(MovieCodecPlugin "/SAFESEH:NO")
 endif(MSVC)
 
 ENDIF(EXISTS "${ffmpeg_Root}")

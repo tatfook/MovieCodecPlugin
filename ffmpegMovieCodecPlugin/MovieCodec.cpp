@@ -48,6 +48,19 @@ AudioRecordAudioFromMicrophone recorder;
 
 using namespace ParaEngine;
 
+static void av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
+{
+	static FILE *fp = NULL;
+
+	if (!fp)
+		fp = fopen("C:/Users/azoth/Desktop/av_debug.log", "a+"); 
+	if (fp) {
+		vfprintf(fp, fmt, vl);
+		fflush(fp);
+	}
+}
+
+
 ParaEngine::MovieCodec::MovieCodec()
 : m_bIsBegin(false)
 , m_pCodecContext(NULL)
@@ -102,7 +115,7 @@ ParaEngine::MovieCodec::MovieCodec()
 	m_pAudioCapture = new CAudioCapture();
 	m_bCaptureAudio = true;
 
-	OUTPUT_LOG("MovieCodec initialized\n");
+	OUTPUT_LOG("MovieCodec initialized.\n");
 }
 
 ParaEngine::MovieCodec::~MovieCodec()
@@ -119,6 +132,7 @@ void ParaEngine::MovieCodec::StaticInit()
 	avcodec_register_all();
 	//avfilter_register_all();
 	// avformat_network_init();
+	av_log_set_callback(av_log_callback);
 }
 
 void ParaEngine::MovieCodec::Release()
@@ -582,6 +596,10 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 
 	OUTPUT_LOG("Total frames captured: %d !\n", nFrameCount);
 	OUTPUT_LOG("Last frame number: %d !\n", nLastFrameNum);
+
+	// record the end time
+	pGameFRC->GetAttributeClass()->GetField("Time")->Set(pGameFRC, lastTime);
+	m_AudioMixer->SetCaptureEndTime(lastTime);
 
 	// set back previous AsynChunkMode value when we finish capturing video
 	pBlockEngine->GetAttributeClass()->GetField("AsyncChunkMode")->Set(pBlockEngine, bPreAsyncChunkModeValue);
