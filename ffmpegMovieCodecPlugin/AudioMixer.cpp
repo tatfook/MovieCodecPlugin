@@ -823,7 +823,7 @@ void AudioMixer::ProcessInputAudios()
 	}
 	m_Audios.insert(m_Audios.end(),loopRecords.begin(), loopRecords.end());
 
-	// clip video if they were stopped during playing
+	// clip audios that were stopped when playing
 	for (int i = 0; i < m_Audios.size(); ++i) {
 		if (m_Audios[i].m_nEndTime > 0 || m_Audios[i].m_nSeekPos > 0) {
 			std::string fileName = this->ClipAudio(m_Audios[i]);
@@ -884,10 +884,12 @@ void AudioMixer::ProcessInputAudios()
 
 	AudioRecord emptyFile("", 0, 0);
 	std::vector<AudioRecord> finalAudio;
-	finalAudio.push_back(todos.front());
-	this->OpenInputs(finalAudio);
-	this->CreateMixFilterGraph(finalAudio);
-	this->MixAudios(emptyFile);
+	if (todos.size() > 0) {
+		finalAudio.push_back(todos.front());
+		this->OpenInputs(finalAudio);
+		this->CreateMixFilterGraph(finalAudio);
+		this->MixAudios(emptyFile);
+	}
 	this->CleanUp();
 
 	//// remove the temporary file
