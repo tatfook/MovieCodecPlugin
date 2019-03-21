@@ -110,7 +110,7 @@ CORE_EXPORT_DECL const char* LibDescription()
 
 CORE_EXPORT_DECL unsigned long LibVersion()
 {
-	return 3;
+	return 7;
 }
 
 CORE_EXPORT_DECL int LibNumberClasses()
