@@ -6,9 +6,5 @@
 # NOTE: modify the root directory path if it is installed at a different location. 
 
 # Note: include the ParaEngine/NPLRuntime include directory
-if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
-	message("NPLRUNTIME_ROOT environment variable not set")
-else()
-	set(ParaEngineClient_SOURCE_DIR $ENV{NPLRUNTIME_ROOT}/Client/trunk/ParaEngineClient)
-	add_subdirectory (ffmpegMovieCodecPlugin)
-endif()
+
+add_subdirectory (ffmpegMovieCodecPlugin)

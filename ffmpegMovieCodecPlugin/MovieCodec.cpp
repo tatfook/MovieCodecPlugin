@@ -53,7 +53,8 @@ static void av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
 	static FILE *fp = NULL;
 
 	if (!fp)
-		fp = fopen("C:/Users/azoth/Desktop/av_debug.log", "a+"); 
+		// debug use, you can change it to any dir you like
+		fp = fopen("C:/Users/sleep/Desktop/av_debug.log", "a+"); 
 	if (fp) {
 		vfprintf(fp, fmt, vl);
 		fflush(fp);
@@ -132,7 +133,10 @@ void ParaEngine::MovieCodec::StaticInit()
 	avcodec_register_all();
 	//avfilter_register_all();
 	// avformat_network_init();
+
+#ifdef OUTPUT_FFMPEG_LOG
 	av_log_set_callback(av_log_callback);
+#endif // OUTPUT_FFMPEG_LOG
 }
 
 void ParaEngine::MovieCodec::Release()
@@ -576,7 +580,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			// wait render engine to finish current frame 
 			while (nItemsLeft>0 || nDirtyBlockCount>0 || (nCurrentFrameNum < nLastFrameNum)){
 				// nItemsLeft or nDirtyBlockCount bigger than 0 implies the engine has not finished rendering the current scene yet
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				std::this_thread::sleep_for(std::chrono::milliseconds(25));
 				nItemsLeft = -1, nDirtyBlockCount = -1;
 				pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
 				pBlockEngine->GetAttributeClass()->GetField("DirtyBlockCount")->Get(pBlockEngine, &nDirtyBlockCount);
@@ -590,7 +594,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				nFrameCount++;	
 			}
 			nLastFrameNum = nCurrentFrameNum;
-			std::this_thread::sleep_for(std::chrono::milliseconds(25));
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
 	}// end for loop
 
