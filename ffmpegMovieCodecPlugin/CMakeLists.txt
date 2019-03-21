@@ -9,7 +9,7 @@ set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
-	set(ParaEngineClient_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../../../NPLRuntime/src/NPLRuntime/Client/trunk/ParaEngineClient)
+	set(ParaEngineClient_SOURCE_DIR ${CLIENT_SOURCE_DIR}/trunk/ParaEngineClient)
 else()
 	set(ParaEngineClient_SOURCE_DIR $ENV{NPLRUNTIME_ROOT}/Client/trunk/ParaEngineClient)
 endif()
