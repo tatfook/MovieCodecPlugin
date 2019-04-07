@@ -320,9 +320,6 @@ DWORD ParaEngine::MovieCodec::EndCaptureInThread()
 		avio_close(m_pFormatContext->pb);
 	}
 
-
-
-
 	/* free the stream */
 	avformat_free_context(m_pFormatContext);
 	m_pFormatContext = NULL;
