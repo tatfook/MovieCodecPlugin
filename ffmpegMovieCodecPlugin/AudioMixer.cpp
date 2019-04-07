@@ -892,10 +892,10 @@ void AudioMixer::ProcessInputAudios()
 	}
 	this->CleanUp();
 
-	//// remove the temporary file
-	//for (int i = 0; i < tempRecords.size(); ++i) {
-	//	std::remove(tempRecords[i].m_FileName.c_str());
-	//}
+	// remove the temporary file
+	for (int i = 0; i < tempRecords.size(); ++i) {
+		std::remove(tempRecords[i].m_FileName.c_str());
+	}
 }
 
 void AudioMixer::ParseAudioFiles(const std::string& rawdata)
@@ -1273,8 +1273,6 @@ void AudioMixer::CollectInputsInfo()
 		AVStream* stream = pInputFormatContext->streams[0];
 		m_Audios[i].m_Duration = (float)(stream->duration * stream->time_base.num) / (float)stream->time_base.den;
 
-
-
 		// Don't forget to close the audio encoder
 		avcodec_close(pInputFormatContext->streams[0]->codec);
 		avformat_close_input(&pInputFormatContext);
@@ -1301,7 +1299,9 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 	AVFormatContext* inputFmtCtx = nullptr;
 	std::string trimmedFile = audio.m_FileName;
 	this->OpenAudioInput(audio.m_FileName.c_str(), inputFmtCtx, inputCodecCtx);
-	if (inputFmtCtx == nullptr || audio.m_nStartTime < m_nCaptureStartTime)goto end;
+	if (inputFmtCtx == nullptr || audio.m_nStartTime < m_nCaptureStartTime) {
+		goto end;
+	}
 
 #pragma region CREATE FILTER GRAPH
 	// create atrim filter graph 
@@ -1311,33 +1311,36 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 		goto end;
 	}
 
-	// set atrim descriptor 
-	float start = -1.0;
-	float end = -1.0;
-	start =  (audio.m_nSeekPos > 0 ? audio.m_nSeekPos : 0.0);
-	if (audio.m_nEndTime > 0) end = (audio.m_nEndTime - audio.m_nStartTime) / 1000.0;
-	
-	char descrpt[512];
-	// at least one of start and end is bigger than zero
-	if (start > 0 && end > 0) {
-		std::sprintf(descrpt, "atrim=start=%f:end=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu",start, end,
-			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
-	}else if (start > 0) {
-		std::sprintf(descrpt, "atrim=start=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu", start,
-			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
-	}else {
-		std::sprintf(descrpt, "atrim=end=%f,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu", end,
-			av_get_sample_fmt_name(m_OutputAudioCodecCtx->sample_fmt), m_OutputAudioCodecCtx->sample_rate, m_OutputAudioCodecCtx->channel_layout);
-	}
-
-	AVFilterInOut* inputs = nullptr;
-	AVFilterInOut* outputs = nullptr;
-	int ret = avfilter_graph_parse2(graph, descrpt, &inputs, &outputs);
-	if (ret < 0) {
-		OUTPUT_LOG(descrpt);
-		OUTPUT_LOG("Failed to parse filter description: %s!", descrpt);
+	// creat atrim filter 
+	AVFilterContext* trim = avfilter_graph_alloc_filter(graph, avfilter_get_by_name("atrim"), nullptr);
+	if (trim == nullptr) {
+		OUTPUT_LOG("Could not find the atrim filter!\n");
 		goto end;
 	}
+
+	// set atrim options
+	int64_t start = 0;
+	int64_t end = -1;
+	start = (audio.m_nSeekPos > 0 ? audio.m_nSeekPos : 0.0);
+	if (audio.m_nEndTime > 0) {
+		end = (audio.m_nEndTime - audio.m_nStartTime) / 1000.0 + 1;
+	}
+	start *= inputCodecCtx->sample_rate;
+	end *= inputCodecCtx->sample_rate;
+
+	char options[512];
+	// at least one of start and end is bigger than zero
+	if (start > 0 && end > 0) {
+		snprintf(options, sizeof(options), "start_sample=%lld:end_sample=%lld", start, end);
+	}else if (start > 0) {
+		snprintf(options, sizeof(options), "start_sample=%lld", start);
+	}else if (end > 0) {
+		snprintf(options, sizeof(options), "end_sample=%lld", end);
+	}else {
+		OUTPUT_LOG("Invalid interval!\n");
+		goto end;
+	}	
+	int ret = avfilter_init_str(trim, options);
 
 	// Create the abuffer filter to buffer audio frames, and make them available to the filter chain.
 	const AVFilter* buffer = avfilter_get_by_name("abuffer");
@@ -1360,9 +1363,9 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 		goto end;
 	}
 	// link to the trim filter
-	ret = avfilter_link(abufferCtx, 0, inputs->filter_ctx, inputs->pad_idx);
+	ret = avfilter_link(abufferCtx, 0, trim, 0);
 	if (ret < 0) {
-		OUTPUT_LOG("Could not link the abuffer filter to adelay filter!\n");
+		OUTPUT_LOG("Could not link the abuffer filter to atrim filter!\n");
 		goto end;
 	}
 
@@ -1377,7 +1380,7 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 		OUTPUT_LOG("Could not find the abuffersink filter!\n");
 		goto end;
 	}
-	ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, sinkbufferCtx, 0);
+	ret = avfilter_link(trim, 0, sinkbufferCtx, 0);
 	if (ret < 0) {
 		OUTPUT_LOG("Could not link the abuffer filter to adelay filter!\n");
 		goto end;
@@ -1431,14 +1434,14 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 	AVStream* stream = avformat_new_stream(outputFormat, codec);
 
 	AVCodecContext* outputCodecCtx = stream->codec; 
-	outputCodecCtx->channels = m_OutputAudioCodecCtx->channels; 
-	outputCodecCtx->channel_layout = m_OutputAudioCodecCtx->channel_layout;
-	outputCodecCtx->sample_rate = m_OutputAudioCodecCtx->sample_rate;
-	outputCodecCtx->sample_fmt = m_OutputAudioCodecCtx->sample_fmt;
-	outputCodecCtx->bit_rate = m_OutputAudioCodecCtx->bit_rate;
+	outputCodecCtx->channels = inputCodecCtx->channels;
+	outputCodecCtx->channel_layout = inputCodecCtx->channel_layout;
+	outputCodecCtx->sample_rate = inputCodecCtx->sample_rate;
+	outputCodecCtx->sample_fmt = inputCodecCtx->sample_fmt;
+	outputCodecCtx->bit_rate = inputCodecCtx->bit_rate;
 
 	/** Allow the use of the experimental AAC encoder */
-	outputCodecCtx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+	//outputCodecCtx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 
 	/** Set the sample rate for the container. */
 	stream->time_base.den = outputCodecCtx->sample_rate;
@@ -1485,7 +1488,9 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 				framePts += filteredFrame->nb_samples;
 				avcodec_send_frame(outputCodecCtx, filteredFrame);
 				if (avcodec_receive_packet(outputCodecCtx, &outPkt) == 0) {
-					if (av_interleaved_write_frame(outputFormat, &outPkt) != 0)OUTPUT_LOG("Error while writing audio frame");
+					if (av_interleaved_write_frame(outputFormat, &outPkt) != 0) {
+						OUTPUT_LOG("Error while writing audio frame");
+					}
 					av_packet_unref(&outPkt);
 				}
 			}
