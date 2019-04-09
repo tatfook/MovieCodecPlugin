@@ -1330,7 +1330,7 @@ std::string AudioMixer::ClipAudio(AudioRecord audio)
 
 	char options[512];
 	// at least one of start and end is bigger than zero
-	if (start > 0 && end > 0) {
+	if (start > 0 && end > start) {
 		snprintf(options, sizeof(options), "start_sample=%lld:end_sample=%lld", start, end);
 	}else if (start > 0) {
 		snprintf(options, sizeof(options), "start_sample=%lld", start);
