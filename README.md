@@ -16,13 +16,13 @@ This file can be copied to `Mod/MovieCodecPlugin.zip` to install it manually to 
 Open paracraft's mod site and install MovieCodecPlugin, make sure it is enabled by default.
 
 ### How to Run
-Press F9 or use `/recoder` command to launch the movie codec.
+Press F9 or use `/record` command to launch the movie codec.
 
 ![image](https://user-images.githubusercontent.com/94537/28371691-412a602c-6cd0-11e7-8fb5-18e11be2d4d8.png)
 
 ## 安装指南
 - 使用Paracraft下载MOD
-- 在Paracraft中按F9或输入`/recorder`命令启动插件。
+- 在Paracraft中按F9或输入`/record`命令启动插件。
 
 ## 常见问题
 - 请确保电脑使用的是立体声输出，否则会crash.
