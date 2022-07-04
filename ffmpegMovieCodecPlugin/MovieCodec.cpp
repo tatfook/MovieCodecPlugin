@@ -212,7 +212,9 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	// set default video codec as H.264
 	m_pOutputFormat->video_codec = AV_CODEC_ID_H264;
 	// set default audio codec as MP3
-	m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
+	//m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
+	// set default audio codec as AAC, since iPhone does not support playing mp3 in mp4 video. we will use AAC by default. 
+	m_pOutputFormat->audio_codec = AV_CODEC_ID_AAC;
 	m_video_st = add_stream(m_pFormatContext, &m_video_codec, m_pOutputFormat->video_codec);
 	
 	if (IsCaptureAudio() && m_pOutputFormat->audio_codec != AV_CODEC_ID_NONE)
