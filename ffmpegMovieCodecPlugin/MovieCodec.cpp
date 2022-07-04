@@ -11,6 +11,7 @@
 #include <math.h>
 #include <vector>
 #include <chrono>
+#include <functional>
 
 
 extern "C"
