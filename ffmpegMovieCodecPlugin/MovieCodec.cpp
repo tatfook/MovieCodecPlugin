@@ -13,6 +13,8 @@
 #include <chrono>
 #include <functional>
 
+/// define this for older 2018 ffmpeg version 3.X releases
+#define FFMEPG_V3
 
 extern "C"
 {
@@ -129,11 +131,13 @@ ParaEngine::MovieCodec::~MovieCodec()
 
 void ParaEngine::MovieCodec::StaticInit()
 {
+#ifdef FFMEPG_V3
 	/* Initialize libavcodec, and register all codecs and formats. */
 	av_register_all();
 	avcodec_register_all();
 	//avfilter_register_all();
 	// avformat_network_init();
+#endif
 
 #ifdef OUTPUT_FFMPEG_LOG
 	av_log_set_callback(av_log_callback);
@@ -212,9 +216,10 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	// set default video codec as H.264
 	m_pOutputFormat->video_codec = AV_CODEC_ID_H264;
 	// set default audio codec as MP3
-	//m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
+	m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
 	// set default audio codec as AAC, since iPhone does not support playing mp3 in mp4 video. we will use AAC by default. 
-	m_pOutputFormat->audio_codec = AV_CODEC_ID_AAC;
+	// however, it crashes with Could not open audio codec: -22
+	//m_pOutputFormat->audio_codec = AV_CODEC_ID_AAC;
 	m_video_st = add_stream(m_pFormatContext, &m_video_codec, m_pOutputFormat->video_codec);
 	
 	if (IsCaptureAudio() && m_pOutputFormat->audio_codec != AV_CODEC_ID_NONE)

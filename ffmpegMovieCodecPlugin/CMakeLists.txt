@@ -6,6 +6,7 @@
 
 # NOTE: modify the root directory path if it is installed at a different location. 
 set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
+# set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg5.0.1x86)
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
