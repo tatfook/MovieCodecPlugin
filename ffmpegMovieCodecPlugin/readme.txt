@@ -10,13 +10,7 @@ Date: 2014.5.1
 	otherwise, one will get the "error LNK2026: module unsafe for SAFESEH image." because the ffmpeg lib is not build with the same compiler. 
 
 ---++ Deployment Files
-	copy following files to SDK root. 
-
-	MovieCodecPlugin.dll
-	avcodec-55.dll
-	avutrl-52.dll
-	swscale-2.dll
-	swresample-0.dll
+	Copy MovieCodecPlugin.zip to Mod/ folder or paracraft and enable it.
 
 ---++ Architecture
 	- It implements the IMovieSystem.h interface and links dynamically with the ffmpeg (avcodec) library. avcodec is super large and support almost every codec on the earth. 
@@ -35,3 +29,6 @@ Date: 2014.5.1
 2015.2.19  
 	- use C++ 11 for threading
 	- video encoding and io is moved to another thread. hence there are two threads working, one for graping screen data, the other for encoding. there is a cache of 15 frames in between. 
+
+2019.4
+	- 1080p output supported by github.com/sleepingbuffer
