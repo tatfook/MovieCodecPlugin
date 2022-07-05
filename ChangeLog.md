@@ -1,6 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 2022.7.5 LiXizhi
+I am trying to support AAC audio encoder in mp4, so that audio can be played in iOS. However, ffmepg no longer provide static build shared library files. 
+
 ## [1.0.1] - 2018-05-30 Cheng Yuanchu <sleepybuffer@gmail.com>
 
 ### Added

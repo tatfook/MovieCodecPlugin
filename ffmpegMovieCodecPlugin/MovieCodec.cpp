@@ -13,8 +13,6 @@
 #include <chrono>
 #include <functional>
 
-/// define this for older 2018 ffmpeg version 3.X releases
-#define FFMEPG_V3
 
 extern "C"
 {
@@ -30,6 +28,11 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
+
+/// define this for older 2018 ffmpeg version 3.X releases
+#if LIBAVCODEC_VERSION_MAJOR <= 58
+#define FFMEPG_V3
+#endif
 
 #include "stdafx.h"
 
@@ -214,13 +217,13 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	m_audio_st = NULL;
 	m_nLastLostVideoFrame = -1;
 	// set default video codec as H.264
-	m_pOutputFormat->video_codec = AV_CODEC_ID_H264;
+	int video_codec = AV_CODEC_ID_H264;
 	// set default audio codec as MP3
-	m_pOutputFormat->audio_codec = AV_CODEC_ID_MP3;
+	int audio_codec = AV_CODEC_ID_MP3;
 	// set default audio codec as AAC, since iPhone does not support playing mp3 in mp4 video. we will use AAC by default. 
 	// however, it crashes with Could not open audio codec: -22
-	//m_pOutputFormat->audio_codec = AV_CODEC_ID_AAC;
-	m_video_st = add_stream(m_pFormatContext, &m_video_codec, m_pOutputFormat->video_codec);
+	//int audio_codec = AV_CODEC_ID_AAC;
+	m_video_st = add_stream(m_pFormatContext, &m_video_codec, video_codec);
 	
 	if (IsCaptureAudio() && m_pOutputFormat->audio_codec != AV_CODEC_ID_NONE)
 	{
@@ -230,7 +233,7 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 			if (m_nHeight + 2*m_nLeft >= 1000) {// 1080p, why 1000? because m_nHeight = ((int)(height / 16)) * 16;
 				m_AudioMixer = new AudioMixer(m_pFormatContext, this);
 			}else{
-				m_audio_st = add_stream(m_pFormatContext, &m_audio_codec, m_pOutputFormat->audio_codec);
+				m_audio_st = add_stream(m_pFormatContext, &m_audio_codec, audio_codec);
 			}
 
 			if (m_audio_st)

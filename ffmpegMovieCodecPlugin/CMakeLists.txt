@@ -5,6 +5,7 @@
 # add environment variable NPLRUNTIME_ROOT that point to git root of NPLRuntime.
 
 # NOTE: modify the root directory path if it is installed at a different location. 
+# this is ffmpeg v3.X in 2018, there are breaking API changes since mmpeg v5
 set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
 # set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg5.0.1x86)
 
