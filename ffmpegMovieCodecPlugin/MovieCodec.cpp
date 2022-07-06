@@ -907,9 +907,12 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 	return 0;
 }
 
-int ParaEngine::MovieCodec::EndCapture(std::string auidoMap)
+int ParaEngine::MovieCodec::EndCapture(const char* audioMap)
 {
-	m_strAudioMap = auidoMap;
+	if (audioMap != 0)
+		m_strAudioMap = audioMap;
+	else
+		m_strAudioMap.clear();
 
 	if (!m_bIsBegin)
 		return 0;

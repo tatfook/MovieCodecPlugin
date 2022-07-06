@@ -42,6 +42,7 @@ SET(MovieCodecPlugin_SRCS
 	AudioRecordAudioFromMicrophone.h
 	AudioRecordAudioFromMicrophone.cpp
 	readme.txt
+	../README.md
 	AddCompileLinkFlags.cmake
 )
 
@@ -77,7 +78,7 @@ IF(MSVC)
 	SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
 ENDIF(MSVC)
 
-SET(CMAKE_DEBUG_POSTFIX "_d")
+# SET(CMAKE_DEBUG_POSTFIX "_d")
 
 link_directories("${ffmpeg_Root}/lib/")
 
@@ -128,6 +129,12 @@ if(MSVC)
 		set( OUTPUT_BIN_DIR "${PROJECT_SOURCE_DIR}/../Mod/MovieCodecPlugin/" )
 	endif()
 
+	ADD_CUSTOM_COMMAND(
+		TARGET MovieCodecPlugin
+		POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_BIN_DIR}
+		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:MovieCodecPlugin> ${OUTPUT_BIN_DIR}
+	 )
 endif(MSVC)
 
 ENDIF(EXISTS "${ffmpeg_Root}")
