@@ -6,8 +6,8 @@
 
 # NOTE: modify the root directory path if it is installed at a different location. 
 # this is ffmpeg v3.X in 2018, there are breaking API changes since mmpeg v5
-set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
-# set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg5.0.1x86)
+#set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
+set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86-windows-static)
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
@@ -83,19 +83,38 @@ ENDIF(MSVC)
 link_directories("${ffmpeg_Root}/lib/")
 
 link_libraries(MovieCodecPlugin 
-	libavfilter 
-	libavcodec 
-	libavutil 
-	libavformat 
-	libswscale 
-	libswresample 
+	avfilter 
+	avcodec 
+	avutil 
+	avformat 
+	swscale 
+	swresample 
+
 	libpostproc 
-	advapi32 
+	
 	libx264 
-	mp3lame 
-	bcrypt 
+	
+	#mp3lame
+	libmp3lame-static
+	libmpghip-static
+
+	advapi32 
 	Winmm 
 	Avrt
+	bcrypt
+
+	fdk-aac
+
+	dxva2
+	evr
+	mf
+	mfplat
+	mfplay
+	mfreadwrite
+	mfuuid
+	ws2_32
+	Secur32
+	Strmiids
 )
 
 

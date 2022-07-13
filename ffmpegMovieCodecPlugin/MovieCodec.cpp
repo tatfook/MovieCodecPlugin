@@ -29,8 +29,8 @@ extern "C"
 #include <libswresample/swresample.h>
 }
 
-/// define this for older 2018 ffmpeg version 3.X releases
 #if LIBAVCODEC_VERSION_MAJOR <= 58
+/// define this for older 2018 ffmpeg version 3.x and 4.X releases
 #define FFMEPG_V3
 #endif
 
@@ -128,7 +128,7 @@ ParaEngine::MovieCodec::MovieCodec()
 ParaEngine::MovieCodec::~MovieCodec()
 {
 	SAFE_DELETE(m_pAudioCapture);
-	EndCapture();
+	EndCapture2();
 	CoUninitialize();
 }
 
@@ -176,7 +176,7 @@ void ParaEngine::MovieCodec::video_encode_example(const char *filename, int code
 			}
 			encode_video_frame_data(&(data[0]));
 		}
-		EndCapture();
+		EndCapture2();
 	}
 }
 
@@ -312,14 +312,17 @@ DWORD ParaEngine::MovieCodec::EndCaptureInThread()
 	* close the CodecContexts open when you wrote the header; otherwise
 	* av_write_trailer() may try to use memory that was freed on
 	* av_codec_close(). */
-	av_write_trailer(m_pFormatContext);
+	if (m_nLastError == 0)
+	{
+		av_write_trailer(m_pFormatContext);
 
-	/* Close each codec. */
-	if (m_video_st)
-		close_video(m_pFormatContext, m_video_st);
+		/* Close each codec. */
+		if (m_video_st)
+			close_video(m_pFormatContext, m_video_st);
 
-	if (m_audio_st)
-		close_audio(m_pFormatContext, m_audio_st);
+		if (m_audio_st)
+			close_audio(m_pFormatContext, m_audio_st);
+	}
 
 	if (m_AudioMixer) {
 		delete m_AudioMixer;
@@ -699,7 +702,7 @@ void ParaEngine::MovieCodec::ResetStates()
 int ParaEngine::MovieCodec::BeginCapture(const char *filename, HWND nHwnd, int nLeft, int nTop, int width /*= 0*/, int height /*= 0*/, int m_nFPS /*= 0*/, int codec_id /*= 0*/)
 {
 	if (m_bIsBegin)
-		EndCapture();
+		EndCapture2();
 
 	// reset states
 	ResetStates();
@@ -889,7 +892,7 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 		ret = avcodec_encode_video2(c, &pkt, m_pAvFrame, &got_packet);
 		if (ret < 0) {
 			OUTPUT_LOG("Error encoding frame\n");
-			EndCapture();
+			EndCapture2();
 			return -1;
 		}
 		/* If size is zero, it means the image was buffered. */
@@ -907,7 +910,12 @@ int ParaEngine::MovieCodec::encode_video_frame_data(const BYTE* pData, int nData
 	return 0;
 }
 
-int ParaEngine::MovieCodec::EndCapture(const char* audioMap)
+int ParaEngine::MovieCodec::EndCapture(std::string audioMap)
+{
+	return EndCapture2(audioMap.c_str());
+}
+
+int ParaEngine::MovieCodec::EndCapture2(const char* audioMap)
 {
 	if (audioMap != 0)
 		m_strAudioMap = audioMap;
@@ -1151,18 +1159,18 @@ int ParaEngine::MovieCodec::open_audio(AVFormatContext *oc, AVCodec *codec, AVSt
 		OUTPUT_LOG("Could not allocate audio frame\n");
 		exit(1);
 	}
-
-
+		
 	/* open it */
-	ret = avcodec_open2(c, codec, NULL);
+	ret = avcodec_open2(c, codec, 0);
 	if (ret < 0) {
 		OUTPUT_LOG("Could not open audio codec: %d\n", ret);
 		return -1;
+		//c->codec = codec;
 	}
 
 	m_samples_count = 0;
 	
-	m_src_nb_samples = c->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE ?
+	m_src_nb_samples = (c->codec && (c->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE)) ?
 		10000 : c->frame_size;
 
 	AVSampleFormat avInputFormat = (m_pAudioCapture->GetBitsPerSample() == 16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_FLT);

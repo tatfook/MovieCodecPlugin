@@ -12,8 +12,39 @@ Open this folder with visual studio 2017 or above and build the cmake file.
 The output is `Mod/MovieCodecPlugin/MovieCodecPlugin.dll`, which has no external dependencies.
 
 Run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft mod installer file.
+
+### How to Build FFMPEG with VCPKG
+features: x264,mp3lame,fdk-aac,nonfree 
+```
+vcpkg install ffmpeg[x264,mp3lame,fdk-aac,nonfree]:x86-windows-static
+```
 This file can be copied to `Mod/MovieCodecPlugin.zip` to install it manually to paracraft.
 
+
+### How to Build FFMPEG From Source (Not recommended)
+currently only FFMPEG 3.4.X is supported, which is released in 2018. There are some breaking API changes since FFMPEG 4.0. 
+Building FFMPEG static library with visual studio is kind of complicated. 
+follow the offical document, here are some highlights:
+
+1. install msys2
+1. install yasm
+1. run msys2 shell, and add visual studio cl/link folder to PATH with 
+open command line from visual studio, then open msys2_shell, which will inherit PATH variable. 
+```
+export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.30.30705/bin/Hostx86/x86/":$PATH
+```
+1. install pkg-config and diff tools in msys2
+```
+pacman -S pkgconf
+pacman -S diffutils
+```
+1. run configure in msys2 shell
+```
+./configure --toolchain=msvc --enable-gpl --enable-nonfree
+make
+make install
+```
+external libraries are required in order to compile with `--enable-libx264 --enable-libmp3lame`.
 
 ### How to Debug
 Run "Run.bat" to start debugging the dll.

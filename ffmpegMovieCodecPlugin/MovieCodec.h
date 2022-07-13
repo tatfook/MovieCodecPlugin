@@ -58,7 +58,7 @@ namespace ParaEngine
 		virtual int encode_video_frame_data_async(const BYTE* pData, int nDataSize = 0, int* pnFrameCount = 0);
 
 		/** end recording for the current file. */
-		virtual int EndCapture(const char* audioMap = NULL);
+		virtual int EndCapture(std::string audioMap = "");
 
 		/** is recording */
 		virtual bool IsRecording();
@@ -102,6 +102,9 @@ namespace ParaEngine
 		*  - 4 for frame interlaved mode, where the odd frame is the left eye and even frame is the right image;
 		*/
 		virtual MOVIE_CAPTURE_MODE GetStereoCaptureMode();
+
+		/** end recording for the current file. */
+		virtual int EndCapture2(const char* audioMap = NULL);
 	public:
 		DWORD CaptureThreadFunction();
 		DWORD EncodingThreadFunction();
