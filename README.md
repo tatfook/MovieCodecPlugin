@@ -14,15 +14,16 @@ The output is `Mod/MovieCodecPlugin/MovieCodecPlugin.dll`, which has no external
 Run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft mod installer file.
 
 ### How to Build FFMPEG with VCPKG
+currently only FFMPEG 4.X is supported. There are some breaking API changes since FFMPEG 5.0. 
+
 features: x264,mp3lame,fdk-aac,nonfree 
 ```
 vcpkg install ffmpeg[x264,mp3lame,fdk-aac,nonfree]:x86-windows-static
 ```
-This file can be copied to `Mod/MovieCodecPlugin.zip` to install it manually to paracraft.
-
+copy x86-windows-static from vcpkg package folder to current project folder, replacing all include files and lib files. 
 
 ### How to Build FFMPEG From Source (Not recommended)
-currently only FFMPEG 3.4.X is supported, which is released in 2018. There are some breaking API changes since FFMPEG 4.0. 
+currently only FFMPEG 4.X is supported, which is released in 2018. There are some breaking API changes since FFMPEG 5.0. 
 Building FFMPEG static library with visual studio is kind of complicated. 
 follow the offical document, here are some highlights:
 
