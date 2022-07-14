@@ -216,15 +216,17 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
 	m_video_st = NULL;
 	m_audio_st = NULL;
 	m_nLastLostVideoFrame = -1;
-	// set default video codec as H.264
-	int video_codec = AV_CODEC_ID_H264;
+	// set default video codec as H.264, for mp4 file, the default video encoder is already AV_CODEC_ID_H264
+	//int video_codec = AV_CODEC_ID_H264;
+	int video_codec = m_pOutputFormat->video_codec;
 	// set default audio codec as MP3
-	int audio_codec = AV_CODEC_ID_MP3;
+	//int audio_codec = AV_CODEC_ID_MP3;
 	// set default audio codec as AAC, since iPhone does not support playing mp3 in mp4 video. we will use AAC by default. 
-	// however, it crashes with Could not open audio codec: -22
+	// for mp4 file, the default audio encoder is already AV_CODEC_ID_AAC
 	//int audio_codec = AV_CODEC_ID_AAC;
+	int audio_codec = m_pOutputFormat->audio_codec;
 	m_video_st = add_stream(m_pFormatContext, &m_video_codec, video_codec);
-	
+
 	if (IsCaptureAudio() && m_pOutputFormat->audio_codec != AV_CODEC_ID_NONE)
 	{
  		if (m_pAudioCapture->BeginCaptureInThread() == 0)
@@ -998,6 +1000,21 @@ AVStream * ParaEngine::MovieCodec::add_stream(AVFormatContext *oc, AVCodec **cod
 		c->bit_rate = m_nAudioBitRate;
 		c->sample_rate =  m_pAudioCapture->GetSampleRate();
 		c->channels = m_pAudioCapture->GetChannels();
+		// fixed by Xizhi 2022.7: channel_layout is required by AAC encoder
+		//c->channel_layout = m_pAudioCapture->GetChannels() >= 2 ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
+		//c->channels = av_get_channel_layout_nb_channels(c->channel_layout);
+		if(c->channels == 1)
+			c->channel_layout = AV_CH_LAYOUT_MONO;
+		else if (c->channels == 2)
+			c->channel_layout = AV_CH_LAYOUT_STEREO;
+		else if (c->channels == 3)
+			c->channel_layout = AV_CH_LAYOUT_SURROUND;
+		else if (c->channels == 4)
+			c->channel_layout = AV_CH_LAYOUT_QUAD;
+		else if (c->channels == 5)
+			c->channel_layout = AV_CH_LAYOUT_5POINT0;
+		else if (c->channels == 6)
+			c->channel_layout = AV_CH_LAYOUT_QUAD;
 		break;
 
 	case AVMEDIA_TYPE_VIDEO:
@@ -1159,7 +1176,11 @@ int ParaEngine::MovieCodec::open_audio(AVFormatContext *oc, AVCodec *codec, AVSt
 		OUTPUT_LOG("Could not allocate audio frame\n");
 		exit(1);
 	}
-		
+	// fixed by LiXizhi 2022.7.13:  assign audio format
+	m_audio_frame->format = c->sample_fmt;
+	m_audio_frame->channel_layout = c->channel_layout;
+	m_audio_frame->channels = c->channels;
+
 	/* open it */
 	ret = avcodec_open2(c, codec, 0);
 	if (ret < 0) {
@@ -1179,6 +1200,9 @@ int ParaEngine::MovieCodec::open_audio(AVFormatContext *oc, AVCodec *codec, AVSt
 		OUTPUT_LOG("Could not allocate source samples\n");
 		return -1;
 	}
+
+	// fixed by LiXizhi 2022.7.13:  assign audio format
+	m_audio_frame->nb_samples = m_src_nb_samples;
 
 	/* compute the number of converted samples: buffering is avoided
 	* ensuring that the output buffer will contain at least all the
