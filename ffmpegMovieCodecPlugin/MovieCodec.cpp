@@ -575,6 +575,11 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 		}
 
 		{
+			int FPS = GetCoreInterface()->GetAppInterface()->GetFPS();
+			if (FPS == 0) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				continue;
+			}
 			// get "ItemsLeft" to nItemsLeft, "DirtyBlockCount" to nDirtyBlockCount
 			int nItemsLeft = -1, nDirtyBlockCount = -1;
 			pAsyncLoader->GetAttributeClass()->GetField("ItemsLeft")->Get(pAsyncLoader, &nItemsLeft);
@@ -607,7 +612,12 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 				nFrameCount++;	
 			}
 			nLastFrameNum = nCurrentFrameNum;
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+			FPS = FPS < m_nRecordingFPS ? FPS : m_nRecordingFPS;
+			int interval = 1000 / FPS / 2;
+			interval = interval > m_nCaptureInterval ? interval : m_nCaptureInterval;
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(interval));
 		}
 	}// end for loop
 
@@ -649,6 +659,11 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoopOriginal()
 			bDone = true;
 			continue; // exits loop
 		}
+		int FPS = GetCoreInterface()->GetAppInterface()->GetFPS();
+		if (FPS == 0) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			continue;
+		}
 
 		DWORD nCurTime = timeGetTime();
 
@@ -689,7 +704,12 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoopOriginal()
 		{
 			// write_frame(m_pFormatContext, NULL, NULL, NULL);
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(m_nCaptureInterval));
+
+		FPS = FPS < m_nRecordingFPS ? FPS : m_nRecordingFPS;
+		int interval = 1000 / FPS / 2;
+		interval = interval > m_nCaptureInterval ? interval : m_nCaptureInterval;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(interval));
 	}
 }
 
