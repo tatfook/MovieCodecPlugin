@@ -82,6 +82,7 @@ AudioMixer::AudioMixer(AVFormatContext* fmtCtx, ParaEngine::MovieCodec* movieCod
 	, _movieCodec( movieCodec)
 	, m_OutputAudioCodec(nullptr)
 	, m_pConvertedDataBuffer(nullptr)
+	, m_FilterGraph(nullptr)
 {
 	m_Audios.clear();
 	InitAudioStream();
@@ -941,6 +942,7 @@ void AudioMixer::CleanUp()
 		avfilter_free(m_BufferSrcCtx[i]);
 	}
 	avfilter_free(m_BuffersinkCtx);
+	m_BuffersinkCtx = nullptr;
 	
 	avfilter_graph_free(&m_FilterGraph);
 }
