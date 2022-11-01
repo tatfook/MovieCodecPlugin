@@ -99,6 +99,7 @@ ParaEngine::MovieCodec::MovieCodec()
 , m_nMaxCacheFrames(30)
 , m_AudioMixer(nullptr)
 , m_nFrameIndex(0)
+, m_bOver1080p(false)
 {
 	CoInitialize(NULL);
 	StaticInit();
@@ -232,7 +233,8 @@ DWORD ParaEngine::MovieCodec::BeginCaptureInThread()
  		if (m_pAudioCapture->BeginCaptureInThread() == 0)
 		{
 			m_nLastLeftDataCount = 0;
-			if (m_nHeight + 2*m_nLeft >= 1000) {// 1080p, why 1000? because m_nHeight = ((int)(height / 16)) * 16;
+			m_bOver1080p = m_nHeight + 2 * m_nLeft >= 1000;// 1080p, why 1000? because m_nHeight = ((int)(height / 16)) * 16;
+			if (m_bOver1080p) {
 				m_AudioMixer = new AudioMixer(m_pFormatContext, this);
 			}else{
 				m_audio_st = add_stream(m_pFormatContext, &m_audio_codec, audio_codec);
@@ -501,7 +503,7 @@ DWORD ParaEngine::MovieCodec::CaptureThreadFunction()
 		return res;
 	}
 
-	if (m_AudioMixer) {
+	if (m_bOver1080p) {
 		CaptureThreadFunctionCaptureLoop1080P();
 	}else {
 		CaptureThreadFunctionCaptureLoopOriginal();

@@ -251,7 +251,7 @@ void AudioMixer::DelayAllInputs(std::vector<AudioRecord>& delayedAudios)
 
 		// set delay 
 		int timeLapse = m_Audios[i].m_nStartTime - m_nCaptureStartTime;
-		char descrpt[128];
+		char descrpt[512];
 		memset(descrpt, 0, sizeof(descrpt));
 		std::sprintf(descrpt, "aresample=icl=%llu:ocl=%llu:isr=%d:osr=%d:isf=%s:osf=%s,adelay=%d|%d,aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=%llu",//apad = whole_len = 11000,
 			inputCodecCtxs[i]->channel_layout,
@@ -811,6 +811,9 @@ void AudioMixer::ProcessInputAudios()
 			float dur = (m_Audios[i].m_nEndTime - m_Audios[i].m_nStartTime) / 1000.0 / m_Audios[i].m_Duration;
 			int numLoop = (int)dur;
 			int duration = m_Audios[i].m_Duration * 1000;// in milliseconds
+
+			m_Audios[i].m_nEndTime = m_Audios[i].m_nStartTime + (dur - numLoop)*duration;
+
 			for (int j = 0; j < numLoop; ++j) {
 				int start = m_Audios[i].m_nEndTime + j * duration;
 				int end = -1;
@@ -818,8 +821,6 @@ void AudioMixer::ProcessInputAudios()
 				loopRecords.emplace_back(loopRecord);
 			}
 
-			m_Audios[i].m_nStartTime + numLoop * duration;
-			m_Audios[i].m_nEndTime = (dur - numLoop)*duration;
 		}
 	}
 	m_Audios.insert(m_Audios.end(),loopRecords.begin(), loopRecords.end());
@@ -908,12 +909,13 @@ void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 	std::vector<std::string> audioFiles = { first, last };
 	for (int i = 0; i < audioFiles.size()-1; i+=5 ) {
 		std::string name = audioFiles[i];
-		int start, end, seek, isloop;
+		int start, end, seek, isloop,totalTime;
 		std::sscanf(audioFiles[i + 1].c_str(), "%d", &start);
 		std::sscanf(audioFiles[i + 2].c_str(), "%d", &end);
 		std::sscanf(audioFiles[i + 3].c_str(), "%d", &seek);
 		std::sscanf(audioFiles[i + 4].c_str(), "%d", &isloop);
-		m_Audios.emplace_back(AudioRecord(name, start, end, seek, isloop));
+		std::sscanf(audioFiles[i + 5].c_str(), "%d", &totalTime);
+		m_Audios.emplace_back(AudioRecord(name, start, end, seek, isloop, totalTime));
 	}
 }
 
@@ -1271,9 +1273,10 @@ void AudioMixer::CollectInputsInfo()
 		}
 
 		// quick method
-		long long duration = 0;
 		AVStream* stream = pInputFormatContext->streams[0];
-		m_Audios[i].m_Duration = (float)(stream->duration * stream->time_base.num) / (float)stream->time_base.den;
+		long long duration = (float)(stream->duration * stream->time_base.num) / (float)stream->time_base.den;
+		int xx = m_Audios[i].m_Duration;
+		//m_Audios[i].m_Duration = (float)(stream->duration * stream->time_base.num) / (float)stream->time_base.den;
 
 		// Don't forget to close the audio encoder
 		avcodec_close(pInputFormatContext->streams[0]->codec);

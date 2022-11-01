@@ -20,13 +20,13 @@ namespace ParaEngine {
 
 struct AudioRecord
 {
-	AudioRecord(std::string file, int s, int e = -1, int seek = 0, bool isLoop = false)
+	AudioRecord(std::string file, int s, int e = -1, int seek = 0, bool isLoop = false,int totalIime=-1)
 		: m_FileName(file)
 		, m_nStartTime(s)
 		, m_nEndTime(e)
-		, m_nSeekPos(isLoop)
-		, m_bIsLoop()
-		, m_Duration(-1.0)
+		, m_nSeekPos(seek)
+		, m_bIsLoop(isLoop)
+		, m_Duration(totalIime)
 	{}
 	std::string m_FileName;
 	int m_nStartTime;

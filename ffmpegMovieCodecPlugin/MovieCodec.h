@@ -224,5 +224,7 @@ namespace ParaEngine
 		std::string m_strAudioMap;
 		AudioMixer* m_AudioMixer;
 		unsigned int m_nFrameIndex;
+
+		bool m_bOver1080p;
 	};
 }
