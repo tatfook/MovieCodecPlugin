@@ -662,17 +662,6 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoopOriginal()
 			continue; // exits loop
 		}
 
-		if (IsCaptureAudio())
-		{
-			CaptureAudioFrame();
-		}
-
-		int FPS = GetCoreInterface()->GetAppInterface()->GetFPS();
-		if (FPS == 0) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
-			continue;
-		}
-
 		DWORD nCurTime = timeGetTime();
 
 		float nFramesToCapture = (float)(((nCurTime - nBeginTime) / 1000.f * m_nRecordingFPS) - m_nCurrentFrame);
@@ -704,16 +693,15 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoopOriginal()
 
 		}
 
+		if (IsCaptureAudio())
+		{
+			CaptureAudioFrame();
+		}
 		if (bFlushStream)
 		{
 			// write_frame(m_pFormatContext, NULL, NULL, NULL);
 		}
-
-		FPS = FPS < m_nRecordingFPS ? FPS : m_nRecordingFPS;
-		int interval = 1000 / FPS / 2;
-		interval = interval > m_nCaptureInterval ? interval : m_nCaptureInterval;
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+		std::this_thread::sleep_for(std::chrono::milliseconds(m_nCaptureInterval));
 	}
 }
 
