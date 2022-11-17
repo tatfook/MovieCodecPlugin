@@ -579,7 +579,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 		{
 			int FPS = GetCoreInterface()->GetAppInterface()->GetFPS();
 			if (FPS == 0) {
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
 				continue;
 			}
 			// get "ItemsLeft" to nItemsLeft, "DirtyBlockCount" to nDirtyBlockCount
@@ -618,7 +618,7 @@ void ParaEngine::MovieCodec::CaptureThreadFunctionCaptureLoop1080P()
 			FPS = FPS < m_nRecordingFPS ? FPS : m_nRecordingFPS;
 			int interval = 1000 / FPS / 2;
 			interval = interval > m_nCaptureInterval ? interval : m_nCaptureInterval;
-
+			interval = max(50,interval);
 			std::this_thread::sleep_for(std::chrono::milliseconds(interval));
 		}
 	}// end for loop
