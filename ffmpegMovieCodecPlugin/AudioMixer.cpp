@@ -907,7 +907,7 @@ void AudioMixer::ParseAudioFiles(const std::string& rawdata)
 	std::sregex_token_iterator
 		first{ rawdata.begin(), rawdata.end(), re, -1 }, last;
 	std::vector<std::string> audioFiles = { first, last };
-	for (int i = 0; i < audioFiles.size()-1; i+=5 ) {
+	for (int i = 0; i < audioFiles.size()-1; i+=6 ) {
 		std::string name = audioFiles[i];
 		int start, end, seek, isloop,totalTime;
 		std::sscanf(audioFiles[i + 1].c_str(), "%d", &start);
