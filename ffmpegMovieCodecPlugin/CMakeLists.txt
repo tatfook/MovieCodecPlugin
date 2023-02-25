@@ -6,8 +6,14 @@
 
 # NOTE: modify the root directory path if it is installed at a different location. 
 # this is ffmpeg v3.X in 2018, there are breaking API changes since mmpeg v5
-#set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
-set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86-windows-static)
+
+if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+	set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x64-windows-static)
+else()
+	#set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86)
+	set (ffmpeg_Root ${CMAKE_CURRENT_SOURCE_DIR}/../x86-windows-static)
+endif()
+
 
 # Note: include the ParaEngine/NPLRuntime include directory
 if ("$ENV{NPLRUNTIME_ROOT}" STREQUAL "")
