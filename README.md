@@ -16,9 +16,14 @@ Run `MakePackage.bat` which will generate the `MovieCodecPlugin.zip` paracraft m
 ### How to Build FFMPEG with VCPKG
 currently only FFMPEG 4.X is supported. There are some breaking API changes since FFMPEG 5.0. 
 
-features: x264,mp3lame,fdk-aac,nonfree 
+features: x264,mp3lame,fdk-aac,nonfree .
+
+checkout vcpkg to tag 2022.06.16.1，
+
+then run install command in visual studio 64bit command line:
 ```
-vcpkg install ffmpeg[x264,mp3lame,fdk-aac,nonfree]:x86-windows-static
+vcpkg install ffmpeg[x264,mp3lame,fdk-aac,nonfree,postproc]:x86-windows-static
+vcpkg install ffmpeg[x264,mp3lame,fdk-aac,nonfree,postproc]:x64-windows-static
 ```
 copy x86-windows-static from vcpkg package folder to current project folder, replacing all include files and lib files. 
 
